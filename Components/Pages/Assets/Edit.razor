@@ -1,0 +1,258 @@
+@page "/Assets/{Id}/Edit"
+@using DeptDam.Data
+@using DeptDam.Models
+@using DeptDam.Services
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavManager
+@inject IAssetService AssetService
+@inject DeptDam.Services.Storage.IStorageProvider StorageProvider
+
+<PageTitle>Edit Image - @Asset?.OriginalFileName</PageTitle>
+
+@if (Loading)
+{
+    <div class="d-flex justify-content-center p-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else if (Asset == null || !Asset.ContentType.StartsWith("image/"))
+{
+    <div class="container py-5">
+        <div class="alert alert-danger shadow-sm rounded-4">
+            <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i> Unsupported Operation</h5>
+            <p class="mb-0">Image not found or file type is not supported for editing.</p>
+        </div>
+        <div class="mt-4">
+            <a href="/Assets" class="btn btn-outline-secondary rounded-pill px-4">Back to Assets</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container-fluid px-4 py-3 border-bottom bg-white sticky-top shadow-sm mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <a href="/Assets/@Asset.Id" class="btn btn-outline-secondary border-0 rounded-circle p-2">
+                    <i class="bi bi-arrow-left h5 mb-0"></i>
+                </a>
+                <div>
+                    <h4 class="mb-0 fw-bold">@Asset.OriginalFileName</h4>
+                    <span class="badge bg-primary-subtle text-primary rounded-pill fw-normal">Current Version: v@(Asset.Versions?.MaxBy(v => v.VersionNumber)?.VersionNumber ?? 1)</span>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary rounded-pill px-4" @onclick="ResetImage" disabled="@saving">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Filters
+                </button>
+                <button class="btn btn-primary rounded-pill px-4 shadow" @onclick="SaveAsNewRevision" disabled="@saving">
+                    @if(saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Applying...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-save me-1"></i>
+                        <span>Save Version</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-4 pb-5">
+        @if (errorMessage != null)
+        {
+            <div class="alert alert-danger alert-dismissible animate-fade-in mb-4 rounded-4" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2"></i> @errorMessage
+                <button type="button" class="btn-close" @onclick='() => errorMessage = null'></button>
+            </div>
+        }
+
+        <div class="row g-4">
+            <div class="col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                    <div class="card-header bg-white border-bottom p-3">
+                        <h6 class="mb-0 fw-bold text-uppercase small letter-spacing-1">Image Adjustments</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small fw-bold text-secondary">Grayscale</label>
+                                <span class="badge bg-light text-primary">@grayscale%</span>
+                            </div>
+                            <input type="range" class="form-range filter-range" min="0" max="100" @bind="grayscale" @bind:event="oninput" />
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small fw-bold text-secondary">Sepia</label>
+                                <span class="badge bg-light text-primary">@sepia%</span>
+                            </div>
+                            <input type="range" class="form-range filter-range" min="0" max="100" @bind="sepia" @bind:event="oninput" />
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small fw-bold text-secondary">Brightness</label>
+                                <span class="badge bg-light text-primary">@brightness%</span>
+                            </div>
+                            <input type="range" class="form-range filter-range" min="0" max="200" @bind="brightness" @bind:event="oninput" />
+                        </div>
+
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small fw-bold text-secondary">Contrast</label>
+                                <span class="badge bg-light text-primary">@contrast%</span>
+                            </div>
+                            <input type="range" class="form-range filter-range" min="0" max="200" @bind="contrast" @bind:event="oninput" />
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card border-0 bg-primary-subtle text-primary-emphasis rounded-4 p-4">
+                    <div class="d-flex gap-3">
+                        <i class="bi bi-info-circle-fill h4 mb-0 opacity-50"></i>
+                        <div>
+                            <h6 class="fw-bold mb-1">Versioning</h6>
+                            <p class="small mb-0 opacity-85">Saving will create a new incremental version while keeping your original file safe. You can restore any previous version at any time.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-9">
+                <div class="editor-canvas-container rounded-4 shadow-inner">
+                    <div class="editor-canvas-bg rounded-4 d-flex align-items-center justify-content-center p-4">
+                        <img src="/api/media/@Asset.TenantId/@Asset.StorageKey" 
+                             class="img-fluid editor-preview shadow-2xl rounded-2" 
+                             style="filter: grayscale(@(grayscale)%) sepia(@(sepia)%) brightness(@(brightness)%) contrast(@(contrast)%); transition: filter 0.1s; max-height: 70vh; user-select: none;" />
+                    </div>
+                    <div class="canvas-label">PREVIEW CANVAS</div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .letter-spacing-1 { letter-spacing: 0.1rem; }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    @@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .filter-range::-webkit-slider-thumb {
+        background: var(--bs-primary) !important;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    }
+    
+    .editor-canvas-container {
+        position: relative;
+        background: #f8fafc;
+        overflow: hidden;
+        border: 2px solid #edf2f7;
+    }
+    
+    .editor-canvas-bg {
+        background: #0f172a; /* Sophisticated dark navy for contrast */
+        min-height: 75vh;
+        background-image: radial-gradient(#1e293b 1px, transparent 1px);
+        background-size: 20px 20px;
+    }
+    
+    .canvas-label {
+        position: absolute;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.65rem;
+        background: rgba(0,0,0,0.5);
+        color: white;
+        padding: 2px 12px;
+        border-radius: 100px;
+        letter-spacing: 1px;
+        pointer-events: none;
+        backdrop-filter: blur(4px);
+    }
+    
+    .shadow-2xl {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private Asset? Asset;
+    private bool Loading = true;
+    private bool saving = false;
+    private string? errorMessage = null;
+
+    // Filter states
+    private int grayscale = 0;
+    private int sepia = 0;
+    private int brightness = 100;
+    private int contrast = 100;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Asset = await DbContext.Assets
+            .Include(a => a.Versions)
+            .FirstOrDefaultAsync(a => a.Id == Id);
+        Loading = false;
+    }
+
+    private void ResetImage()
+    {
+        grayscale = 0;
+        sepia = 0;
+        brightness = 100;
+        contrast = 100;
+        errorMessage = null;
+    }
+
+    private async Task SaveAsNewRevision()
+    {
+        if (Asset == null) return;
+        
+        saving = true;
+        errorMessage = null;
+        
+        try
+        {
+            using var originalStream = await StorageProvider.GetFileStreamAsync(Asset.StorageKey);
+            
+            using var manipulatedStream = await AssetService.ApplyFiltersAsync(
+                originalStream, 
+                Asset.ContentType, 
+                grayscale, 
+                sepia, 
+                brightness, 
+                contrast);
+            
+            var note = $"Filters applied: Grayscale({grayscale}%), Sepia({sepia}%), Brightness({brightness}%), Contrast({contrast}%)";
+            await AssetService.CreateVersionAsync(
+                Asset.Id, 
+                manipulatedStream, 
+                Asset.OriginalFileName, 
+                Asset.ContentType, 
+                note);
+            
+            NavManager.NavigateTo($"/Assets/{Id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving image: {ex.Message}";
+            Console.WriteLine($"EDIT ERROR: {ex}");
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}
+

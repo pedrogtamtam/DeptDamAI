@@ -1,0 +1,336 @@
+@page "/Admin/AiSettings"
+@using DeptDam.Data
+@using DeptDam.Models
+@using DeptDam.Services
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+@inject IHttpClientFactory HttpFactory
+
+<PageTitle>AI Configuration</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-robot me-2 text-primary"></i>AI Analysis Configuration</h1>
+        <p class="text-secondary small mb-0">Configure Google Gemini AI for automatic image tagging and OCR.</p>
+    </div>
+    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-arrow-up-right me-1"></i> Get a Gemini API Key
+    </a>
+</div>
+
+@if (showAlert)
+{
+    <div class="alert alert-@alertClass alert-dismissible fade show" role="alert">
+        @alertMessage
+        <button type="button" class="btn-close" @onclick="() => showAlert = false"></button>
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-0">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-key-fill text-warning me-2"></i>API Credentials</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-muted text-uppercase">Google Gemini API Key</label>
+                    <div class="input-group">
+                        <input type="@(showKey ? "text" : "password")"
+                               class="form-control font-monospace"
+                               @bind="settings.GoogleAiApiKey"
+                               @bind:event="oninput"
+                               placeholder="AIza..." />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="() => showKey = !showKey">
+                            <i class="bi bi-@(showKey ? "eye-slash" : "eye")"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">Your key is stored securely in the database.</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-muted text-uppercase">
+                        Gemini Model
+                        @if (isLoadingModels)
+                        {
+                            <span class="spinner-border spinner-border-sm ms-2 text-primary"></span>
+                        }
+                    </label>
+                    @if (availableModels.Any())
+                    {
+                        <select class="form-select" @bind="settings.GeminiModel">
+                            @foreach (var m in availableModels)
+                            {
+                                <option value="@m.Id">@m.DisplayName (@m.Id)</option>
+                            }
+                        </select>
+                        <small class="text-success"><i class="bi bi-check-circle me-1"></i>@availableModels.Count models loaded from API</small>
+                    }
+                    else
+                    {
+                        <div class="input-group">
+                            <input type="text" class="form-control" @bind="settings.GeminiModel" placeholder="gemini-2.0-flash" />
+                            <button class="btn btn-outline-primary" type="button" @onclick="LoadModels" disabled="@(string.IsNullOrWhiteSpace(settings.GoogleAiApiKey) || isLoadingModels)">
+                                <i class="bi bi-arrow-repeat"></i> Fetch
+                            </button>
+                        </div>
+                        <small class="text-muted">Enter API key and click Fetch, or Test Connection to auto-populate.</small>
+                    }
+                </div>
+
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoAnalyze" @bind="settings.AutoAnalyzeOnUpload" />
+                        <label class="form-check-label fw-semibold" for="autoAnalyze">
+                            Auto-analyze images on upload
+                        </label>
+                    </div>
+                    <small class="text-muted ms-5">When enabled, every uploaded image is automatically sent to Gemini for tagging and OCR.</small>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary px-4" @onclick="SaveSettings">
+                        <i class="bi bi-save me-1"></i> Save Configuration
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="TestConnection" disabled="@isTesting">
+                        @if (isTesting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-lightning-charge me-1"></i>
+                        }
+                        Test Connection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>What does AI Analysis do?</h6>
+                <ul class="list-unstyled small text-muted">
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Auto-tagging:</strong> Detects objects, scenes, colors, mood &amp; style</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>OCR:</strong> Extracts visible text from images &amp; documents</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Face detection:</strong> Counts faces present in photos</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Re-analyze:</strong> Available on any asset's detail page</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-shield-check text-success me-2"></i>Status</h6>
+                @if (string.IsNullOrWhiteSpace(settings.GoogleAiApiKey))
+                {
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-warning text-dark me-2">Not Configured</span>
+                        <small class="text-muted">Using simulated analysis</small>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success me-2">Configured</span>
+                        <small class="text-muted">Google Gemini active</small>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Model: <strong>@settings.GeminiModel</strong></small><br />
+                        <small class="text-muted">Auto-analyze: <strong>@(settings.AutoAnalyzeOnUpload ? "ON" : "OFF")</strong></small><br />
+                        <small class="text-muted">Last updated: <strong>@settings.UpdatedAt.ToLocalTime().ToString("g")</strong></small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private DeptDam.Models.AiSettings settings = new() { GeminiModel = "gemini-2.0-flash" };
+    private bool showKey = false;
+    private bool isTesting = false;
+    private bool isLoadingModels = false;
+    private bool showAlert = false;
+    private string alertMessage = "";
+    private string alertClass = "success";
+    private List<GeminiModelInfo> availableModels = new();
+
+    private record GeminiModelInfo(string Id, string DisplayName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tid = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tid)) return;
+
+        var existing = await DbContext.AiSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.TenantId == tid);
+        if (existing != null)
+        {
+            settings = existing;
+            // Auto-load model list if key is already saved
+            if (!string.IsNullOrWhiteSpace(settings.GoogleAiApiKey))
+                await LoadModels();
+        }
+        else
+        {
+            settings.TenantId = tid;
+        }
+    }
+
+    private async Task LoadModels()
+    {
+        if (string.IsNullOrWhiteSpace(settings.GoogleAiApiKey)) return;
+
+        isLoadingModels = true;
+        availableModels = new();
+        try
+        {
+            var client = HttpFactory.CreateClient();
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models?key={settings.GoogleAiApiKey}";
+            var resp = await client.GetAsync(url);
+            var body = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                string geminiError = body;
+                try {
+                    using var errDoc = System.Text.Json.JsonDocument.Parse(body);
+                    if (errDoc.RootElement.TryGetProperty("error", out var errEl) &&
+                        errEl.TryGetProperty("message", out var msgEl))
+                        geminiError = msgEl.GetString() ?? body;
+                } catch { }
+                Notify($"❌ ListModels error {(int)resp.StatusCode}: {geminiError}", "danger");
+                return;
+            }
+
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("models", out var modelsEl))
+            {
+                foreach (var m in modelsEl.EnumerateArray())
+                {
+                    var fullName = m.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                    var displayName = m.TryGetProperty("displayName", out var dn) ? dn.GetString() ?? "" : fullName;
+
+                    // Only include models that support generateContent
+                    if (m.TryGetProperty("supportedGenerationMethods", out var methods))
+                    {
+                        var supports = methods.EnumerateArray().Any(x => x.GetString() == "generateContent");
+                        if (!supports) continue;
+                    }
+
+                    // Strip "models/" prefix to get just the model ID
+                    var modelId = fullName.StartsWith("models/") ? fullName["models/".Length..] : fullName;
+                    if (!string.IsNullOrEmpty(modelId))
+                        availableModels.Add(new GeminiModelInfo(modelId, displayName));
+                }
+            }
+
+            // If the currently selected model exists in the list, keep it; otherwise pick first available
+            if (availableModels.Any() && !availableModels.Any(m => m.Id == settings.GeminiModel))
+                settings.GeminiModel = availableModels.First().Id;
+        }
+        catch (Exception ex)
+        {
+            Notify("❌ Failed to fetch models: " + ex.Message, "danger");
+        }
+        finally
+        {
+            isLoadingModels = false;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        var tid = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tid)) return;
+
+        settings.UpdatedAt = DateTime.UtcNow;
+        settings.TenantId = tid;
+
+        var existing = await DbContext.AiSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.TenantId == tid);
+        if (existing == null)
+            DbContext.AiSettings.Add(settings);
+        else
+        {
+            existing.GoogleAiApiKey = settings.GoogleAiApiKey;
+            existing.GeminiModel = settings.GeminiModel;
+            existing.AutoAnalyzeOnUpload = settings.AutoAnalyzeOnUpload;
+            existing.UpdatedAt = settings.UpdatedAt;
+        }
+
+        await DbContext.SaveChangesAsync();
+        Notify("✅ Settings saved successfully.", "success");
+    }
+
+    private async Task TestConnection()
+    {
+        if (string.IsNullOrWhiteSpace(settings.GoogleAiApiKey))
+        {
+            Notify("Please enter an API key first.", "warning");
+            return;
+        }
+
+        isTesting = true;
+        try
+        {
+            // Step 1: fetch & populate available models
+            await LoadModels();
+            if (!availableModels.Any())
+            {
+                // LoadModels already showed an error
+                return;
+            }
+
+            // Step 2: test generateContent with the resolved model
+            var client = HttpFactory.CreateClient();
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{settings.GeminiModel}:generateContent?key={settings.GoogleAiApiKey}";
+            var body = new System.Net.Http.StringContent(
+                System.Text.Json.JsonSerializer.Serialize(new {
+                    contents = new[] { new { parts = new[] { new { text = "Say hello in one word." } } } }
+                }),
+                System.Text.Encoding.UTF8, "application/json");
+
+            var resp = await client.PostAsync(url, body);
+            var responseBody = await resp.Content.ReadAsStringAsync();
+
+            if (resp.IsSuccessStatusCode)
+                Notify($"✅ Connection successful! Using model: {settings.GeminiModel}. {availableModels.Count} models available — select one from the dropdown above.", "success");
+            else
+            {
+                string geminiError = responseBody;
+                try {
+                    using var errDoc = System.Text.Json.JsonDocument.Parse(responseBody);
+                    if (errDoc.RootElement.TryGetProperty("error", out var errEl) &&
+                        errEl.TryGetProperty("message", out var msgEl))
+                        geminiError = msgEl.GetString() ?? responseBody;
+                } catch { }
+                Notify($"❌ API error {(int)resp.StatusCode}: {geminiError}", "danger");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notify("❌ Connection failed: " + ex.Message, "danger");
+        }
+        finally
+        {
+            isTesting = false;
+        }
+    }
+
+    private void Notify(string msg, string cls)
+    {
+        alertMessage = msg;
+        alertClass = cls;
+        showAlert = true;
+    }
+}

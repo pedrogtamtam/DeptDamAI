@@ -1,0 +1,138 @@
+@implements IDisposable
+
+@inject NavigationManager NavigationManager
+
+<div class="nav-menu @(IsCollapsed ? "collapsed" : "")">
+    <div class="top-row ps-3 navbar navbar-light">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="">
+                <span class="bi bi-box-fill text-primary fs-3 me-2"></span>
+                <span class="brand-text fw-bold">DeptDam</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="nav-scrollable">
+        <nav class="nav flex-column">
+            <div class="nav-item px-3 mb-1">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill" aria-hidden="true" title="Home"></span>
+                    <span class="nav-label">Home</span>
+                </NavLink>
+            </div>
+
+            <AuthorizeView Context="topAuthContext">
+                <Authorized>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Assets">
+                            <span class="bi bi-images" aria-hidden="true" title="Assets"></span>
+                            <span class="nav-label">Assets</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Collections">
+                            <span class="bi bi-collection" aria-hidden="true" title="Collections"></span>
+                            <span class="nav-label">Collections</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3 mb-4">
+                        <NavLink class="nav-link" href="Workflow">
+                            <span class="bi bi-kanban" aria-hidden="true" title="Workflow"></span>
+                            <span class="nav-label">Workflow</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-header px-4 mb-2 opacity-50 small fw-bold text-uppercase">Admin</div>
+
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/Users">
+                            <span class="bi bi-people-fill" aria-hidden="true" title="Users"></span>
+                            <span class="nav-label">Users</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/Tenants">
+                            <span class="bi bi-diagram-3-fill" aria-hidden="true" title="Workspaces"></span>
+                            <span class="nav-label">Workspaces</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/Tags">
+                            <span class="bi bi-tags-fill" aria-hidden="true" title="Tags"></span>
+                            <span class="nav-label">Tags</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/CustomFields">
+                            <span class="bi bi-textarea-t" aria-hidden="true" title="Metadata"></span>
+                            <span class="nav-label">Metadata</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/ApiClients">
+                            <span class="bi bi-key-fill" aria-hidden="true" title="API Keys"></span>
+                            <span class="nav-label">Integration</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/AiSettings">
+                            <span class="bi bi-robot" aria-hidden="true" title="AI Settings"></span>
+                            <span class="nav-label">AI Settings</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="mt-auto">
+                        <div class="nav-item px-3 mb-1">
+                            <NavLink class="nav-link" href="Account/Manage">
+                                <span class="bi bi-person-fill" aria-hidden="true" title="Profile"></span>
+                                <span class="nav-label">@topAuthContext.User.Identity?.Name</span>
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-3 mb-3">
+                            <form action="Account/Logout" method="post">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                                <button type="submit" class="nav-link w-100 text-start border-0 bg-transparent">
+                                    <span class="bi bi-arrow-bar-left" aria-hidden="true" title="Logout"></span>
+                                    <span class="nav-label">Logout</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="Account/Login">
+                            <span class="bi bi-person-badge" aria-hidden="true"></span>
+                            <span class="nav-label">Login</span>
+                        </NavLink>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsCollapsed { get; set; }
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

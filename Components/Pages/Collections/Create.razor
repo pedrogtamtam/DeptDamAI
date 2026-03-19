@@ -1,0 +1,178 @@
+@page "/Collections/Create"
+@using DeptDam.Data
+@using DeptDam.Models
+@using DeptDam.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+
+<PageTitle>Create Collection</PageTitle>
+
+<div class="mb-4">
+    <h1 class="h3 mb-0">Create New Collection</h1>
+    <p class="text-secondary small">Organize your assets manually or create a smart collection using tags.</p>
+</div>
+
+<EditForm Model="Model" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+    
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="card-title mb-0">General Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Collection Name</label>
+                        <InputText @bind-Value="Model.Name" class="form-control form-control-lg" placeholder="e.g. Q4 Marketing Campaign" />
+                        <ValidationMessage For="() => Model.Name" class="text-danger small" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Description</label>
+                        <InputTextArea @bind-Value="Model.Description" class="form-control" rows="4" placeholder="Describe the purpose of this collection..." />
+                    </div>
+
+                    <hr class="my-4 opacity-50" />
+
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="mb-0">Smart Collection Config</h5>
+                        <span class="badge bg-primary-subtle text-primary ms-2">Optional</span>
+                    </div>
+                    <p class="text-secondary small mb-4">Select tags to automatically include matching assets in this collection. This collection will update dynamically as assets are tagged.</p>
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        @if (availableTags == null)
+                        {
+                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        }
+                        else
+                        {
+                            @foreach (var tag in availableTags)
+                            {
+                                <button type="button" 
+                                        class="btn btn-sm @(selectedTagIds.Contains(tag.Id) ? "btn-primary" : "btn-outline-secondary") rounded-pill px-3"
+                                        @onclick="() => ToggleTag(tag.Id)">
+                                    <i class="bi @(selectedTagIds.Contains(tag.Id) ? "bi-check-lg" : "bi-plus") me-1"></i>
+                                    @tag.Name
+                                </button>
+                            }
+                            @if (!availableTags.Any())
+                            {
+                                <div class="text-muted small">No tags available. Create them in Tag Management first.</div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary px-4 py-2" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Restoring...</span>
+                    }
+                    else
+                    {
+                        <span>Create Collection</span>
+                    }
+                </button>
+                <a href="/Collections" class="btn btn-outline-secondary px-4 py-2">Cancel</a>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 bg-light">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i> About Smart Collections</h6>
+                    <ul class="small text-secondary ps-3 mb-0">
+                        <li class="mb-2"><strong>Dynamic Population:</strong> Any asset tagged with one of the selected tags will appear in this collection.</li>
+                        <li class="mb-2"><strong>Hybrid Mode:</strong> You can still manually add assets to this collection that don't match the tags.</li>
+                        <li><strong>Always Fresh:</strong> As new assets are uploaded and tagged, they immediately become visible here.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    private CreateCollectionModel Model { get; set; } = new();
+    private List<Tag>? availableTags;
+    private HashSet<string> selectedTagIds = new();
+    private bool isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        availableTags = await DbContext.Tags.OrderBy(t => t.Name).ToListAsync();
+    }
+
+    private void ToggleTag(string tagId)
+    {
+        if (selectedTagIds.Contains(tagId))
+            selectedTagIds.Remove(tagId);
+        else
+            selectedTagIds.Add(tagId);
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        try 
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var currentUser = await UserManager.GetUserAsync(authState.User);
+            if (currentUser == null) return;
+
+            var tenantId = TenantService.GetCurrentTenantId();
+            if (string.IsNullOrEmpty(tenantId)) return;
+
+            var collection = new Collection
+            {
+                Name = Model.Name,
+                Description = Model.Description,
+                CreatedById = currentUser.Id,
+                TenantId = tenantId
+            };
+
+            DbContext.Collections.Add(collection);
+            
+            // Add dynamic tags
+            foreach (var tagId in selectedTagIds)
+            {
+                collection.DynamicTags.Add(new CollectionTag 
+                { 
+                    CollectionId = collection.Id, 
+                    TagId = tagId,
+                    TenantId = tenantId
+                });
+            }
+
+            await DbContext.SaveChangesAsync();
+
+            NavManager.NavigateTo($"/Collections/{collection.Id}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    public class CreateCollectionModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "A name is required")]
+        [System.ComponentModel.DataAnnotations.StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
+        public string Name { get; set; } = string.Empty;
+        
+        public string Description { get; set; } = string.Empty;
+    }
+}

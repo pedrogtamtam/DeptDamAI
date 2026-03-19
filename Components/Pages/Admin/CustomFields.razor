@@ -1,0 +1,269 @@
+@page "/Admin/CustomFields"
+@using DeptDam.Data
+@using DeptDam.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "DAM_Admin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject DeptDam.Services.ITenantService TenantService
+
+<PageTitle>Metadata Settings</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">Custom Metadata Schema</h1>
+        <p class="text-secondary small mb-0">Define reusable metadata fields for assets in your organization.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="ShowCreateForm">
+            <i class="bi bi-plus-lg me-1"></i> Add Custom Field
+        </button>
+    </div>
+</div>
+
+@if (ShowAlert)
+{
+    <div class="alert alert-@AlertClass alert-dismissible fade show" role="alert">
+        @AlertMessage
+        <button type="button" class="btn-close" @onclick="() => ShowAlert = false"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Field Name</th>
+                        <th>Type</th>
+                        <th>Options (if Dropdown)</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (fields == null)
+                    {
+                        <tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></td></tr>
+                    }
+                    else if (!fields.Any())
+                    {
+                        <tr><td colspan="4" class="text-center py-5 text-muted">No custom fields defined. Create one to start tagging assets.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var field in fields)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-medium">
+                                    <i class="bi bi-list-columns-reverse text-primary me-2"></i> @field.Name
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-secondary border">@field.FieldType</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">@(field.FieldType == FieldType.Dropdown ? field.Options : "—")</small>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" @onclick="() => ConfirmDelete(field)">
+                                        <i class="bi bi-trash-fill me-1"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (isCreating)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Custom Field</h5>
+                    <button type="button" class="btn-close" @onclick="CancelCreate"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">FIELD NAME</label>
+                        <input type="text" class="form-control" @bind="newField.Name" placeholder="e.g. Campaign Year" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">FIELD TYPE</label>
+                        <select class="form-select" @bind="newField.FieldType">
+                            @foreach (var type in Enum.GetValues<FieldType>())
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </select>
+                    </div>
+                    @if (newField.FieldType == FieldType.Dropdown)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">DROPDOWN OPTIONS</label>
+                            <input type="text" class="form-control" @bind="newField.Options" placeholder="Comma separated: Option A, Option B" />
+                            <small class="text-muted d-block mt-1">Separate options with a comma (,)</small>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelCreate">Cancel</button>
+                    <button type="button" class="btn btn-primary px-4" @onclick="SaveNewField" disabled="@string.IsNullOrWhiteSpace(newField.Name)">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (fieldToDelete != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title @(usagesCount > 0 && deleteOption == 1 ? "" : "text-danger")">Manage Field Removal</h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>You are managing the custom field: <strong>@fieldToDelete.Name</strong></p>
+                    @if (usagesCount > 0)
+                    {
+                        <div class="alert alert-warning border-warning border-start border-4">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> This metadata is actively tracking data on <strong>@usagesCount</strong> assets!
+                        </div>
+                        <div class="mt-4 border-top pt-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-3">Conflict Resolution Strategy</label>
+                            
+                            <div class="form-check mb-3 p-3 border rounded @(deleteOption == 1 ? "bg-primary-subtle border-primary" : "bg-light")">
+                                <input class="form-check-input ms-1" type="radio" name="delOption" id="del2" checked="@(deleteOption == 1)" @onchange="@(() => deleteOption = 1)" />
+                                <label class="form-check-label ms-2 fw-semibold" style="cursor: pointer" for="del2">
+                                    Migrate & Keep Data
+                                    <span class="d-block fw-normal small text-muted mt-1">Converts the custom definition to 'Plain Text' so existing data isn't lost, but removes its Dropdown/Date restrictions.</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-check p-3 border rounded @(deleteOption == 0 ? "bg-danger-subtle border-danger" : "bg-light")">
+                                <input class="form-check-input ms-1" type="radio" name="delOption" id="del1" checked="@(deleteOption == 0)" @onchange="@(() => deleteOption = 0)" />
+                                <label class="form-check-label ms-2 fw-semibold text-danger" style="cursor: pointer" for="del1">
+                                    Destroy Permanently
+                                    <span class="d-block fw-normal small text-muted mt-1">The field and its attached values on all @usagesCount assets will be permanently wiped.</span>
+                                </label>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i> Zero assets are currently using this field. It is safe to delete.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn @(usagesCount > 0 && deleteOption == 1 ? "btn-primary" : "btn-danger") px-4" @onclick="ProcessDeleteOrConvert">Confirm Action</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CustomField>? fields;
+    private bool isCreating = false;
+    private CustomField newField = new();
+
+    private string AlertMessage = "";
+    private string AlertClass = "success";
+    private bool ShowAlert = false;
+    private CustomField? fieldToDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFields();
+    }
+
+    private async Task LoadFields()
+    {
+        fields = await DbContext.CustomFields.OrderBy(f => f.Name).ToListAsync();
+    }
+
+    private void ShowCreateForm()
+    {
+        newField = new CustomField();
+        isCreating = true;
+    }
+
+    private void CancelCreate()
+    {
+        isCreating = false;
+    }
+
+    private async Task SaveNewField()
+    {
+        if (string.IsNullOrWhiteSpace(newField.Name)) return;
+
+        var tenantId = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tenantId))
+        {
+             ShowNotification("Tenant context missing", "danger");
+             return;
+        }
+
+        newField.TenantId = tenantId;
+        DbContext.CustomFields.Add(newField);
+        await DbContext.SaveChangesAsync();
+
+        isCreating = false;
+        await LoadFields();
+        ShowNotification($"Field '{newField.Name}' created successfully", "success");
+    }
+
+    private int usagesCount = 0;
+    private int deleteOption = 0;
+
+    private async Task ConfirmDelete(CustomField field)
+    {
+        fieldToDelete = field;
+        usagesCount = await DbContext.AssetMetadataValues.CountAsync(v => v.CustomFieldId == field.Id);
+        deleteOption = usagesCount > 0 ? 1 : 0; 
+    }
+
+    private void CancelDelete()
+    {
+        fieldToDelete = null;
+    }
+
+    private async Task ProcessDeleteOrConvert()
+    {
+        if (fieldToDelete == null) return;
+
+        if (usagesCount > 0 && deleteOption == 1)
+        {
+            fieldToDelete.FieldType = FieldType.Text;
+            fieldToDelete.Options = null;
+            await DbContext.SaveChangesAsync();
+            ShowNotification("Field successfully migrated to Plain Text.", "success");
+        }
+        else
+        {
+            DbContext.CustomFields.Remove(fieldToDelete);
+            await DbContext.SaveChangesAsync();
+            ShowNotification("Field & definitions destroyed.", "success");
+        }
+
+        fieldToDelete = null;
+        await LoadFields();
+    }
+
+    private void ShowNotification(string message, string cssClass)
+    {
+        AlertMessage = message;
+        AlertClass = cssClass;
+        ShowAlert = true;
+    }
+}

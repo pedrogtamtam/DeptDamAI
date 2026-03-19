@@ -1,0 +1,88 @@
+@inherits LayoutComponentBase
+
+<div class="page @(IsCollapsed ? "collapsed" : "")">
+    <div class="sidebar">
+        <NavMenu IsCollapsed="IsCollapsed" />
+    </div>
+    <div class="sidebar-toggle-container">
+        <button class="btn sidebar-toggle" onclick="toggleSidebar()">
+            <i class="bi bi-chevron-left toggle-icon"></i>
+        </button>
+    </div>
+
+    <main>
+        <div class="top-row px-4 d-flex justify-content-between align-items-center">
+            <button class="btn btn-light d-block d-md-none border shadow-sm" onclick="toggleSidebarMobile()">
+                <i class="bi bi-list fs-4"></i>
+            </button>
+            <div class="d-flex align-items-center gap-3 w-100 justify-content-end">
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="Assets/Upload" class="btn btn-primary d-flex align-items-center shadow-sm">
+                            <i class="bi bi-cloud-arrow-up-fill me-2"></i> <span>Upload</span>
+                        </a>
+                        <div class="small text-muted border rounded-pill px-3 py-1 bg-light ms-3 d-none d-md-block">
+                            <i class="bi bi-shield-lock me-1"></i>
+                            <strong>User:</strong> @context.User.Identity?.Name | 
+                            <strong>Roles:</strong> @(string.Join(", ", context.User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value)))
+                        </div>
+                    </Authorized>
+                    <NotAuthorized>
+                        <div class="small text-muted">Guest Access</div>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+
+        <article class="content page-content px-4 py-4">
+            <ErrorBoundary>
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent>
+                    <div class="alert alert-danger shadow mt-4">
+                        <h4 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i> Something went wrong</h4>
+                        <p>An unexpected error has occurred while rendering this page.</p>
+                        <hr>
+                        <p class="mb-0">
+                            <button class="btn btn-outline-danger btn-sm" onclick="location.reload()">Reload Page</button>
+                        </p>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
+        </article>
+    </main>
+</div>
+
+@code {
+    private bool IsCollapsed { get; set; }
+}
+
+<script>
+    function toggleSidebar() {
+        var page = document.querySelector('.page');
+        if (page) {
+            page.classList.toggle('collapsed');
+            var icon = page.querySelector('.toggle-icon');
+            if (icon) {
+                if (icon.classList.contains('bi-chevron-left')) {
+                    icon.classList.replace('bi-chevron-left', 'bi-chevron-right');
+                } else {
+                    icon.classList.replace('bi-chevron-right', 'bi-chevron-left');
+                }
+            }
+        }
+    }
+    function toggleSidebarMobile() {
+        var page = document.querySelector('.page');
+        if (page) {
+            page.classList.toggle('show-mobile');
+        }
+    }
+</script>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

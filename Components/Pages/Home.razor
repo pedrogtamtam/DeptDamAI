@@ -1,0 +1,178 @@
+﻿@page "/"
+@using DeptDam.Data
+@using DeptDam.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+
+<PageTitle>DEPT DAM - Dashboard</PageTitle>
+
+<div class="container-fluid p-0 animate-fade-in">
+    <div class="row mb-5 align-items-center bg-white rounded-4 p-5 shadow-sm border border-light g-4">
+        <div class="col-md-7">
+            <div class="badge bg-primary-subtle text-primary mb-3 px-3 py-2 rounded-pill fw-normal letter-spacing-1">WELCOME BACK</div>
+            <h1 class="display-5 fw-bold mb-3">Your Creative Workspace</h1>
+            <p class="lead text-secondary mb-4">Manage, organize, and distribute your digital assets with enterprise-grade security and speed.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="/Assets/Upload" class="btn btn-primary btn-lg px-4 py-2 shadow-sm rounded-pill">
+                    <i class="bi bi-cloud-upload me-2"></i> Upload New Asset
+                </a>
+                <a href="/Collections/Create" class="btn btn-white btn-lg px-4 py-2 border shadow-sm rounded-pill">
+                    <i class="bi bi-collection me-2"></i> Create Collection
+                </a>
+            </div>
+        </div>
+        <div class="col-md-5 d-none d-md-flex justify-content-center">
+            <div class="hero-icon-container">
+                <i class="bi bi-box-fill display-1 text-primary animate-float"></i>
+                <div class="hero-blob"></div>
+            </div>
+        </div>
+    </div>
+
+    @if (Loading)
+    {
+        <div class="d-flex justify-content-center p-5">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4 mb-5">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm rounded-4 p-4 text-center stat-card">
+                    <div class="stat-icon bg-primary-subtle text-primary mb-3 mx-auto">
+                        <i class="bi bi-images h3 mb-0"></i>
+                    </div>
+                    <h2 class="fw-bold mb-1">@TotalAssets</h2>
+                    <p class="text-muted small text-uppercase fw-bold letter-spacing-1 mb-0">Total Assets</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm rounded-4 p-4 text-center stat-card">
+                    <div class="stat-icon bg-info-subtle text-info mb-3 mx-auto">
+                        <i class="bi bi-collection h3 mb-0"></i>
+                    </div>
+                    <h2 class="fw-bold mb-1">@TotalCollections</h2>
+                    <p class="text-muted small text-uppercase fw-bold letter-spacing-1 mb-0">Collections</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm rounded-4 p-4 text-center stat-card">
+                    <div class="stat-icon bg-success-subtle text-success mb-3 mx-auto">
+                        <i class="bi bi-database h3 mb-0"></i>
+                    </div>
+                    <h2 class="fw-bold mb-1">@((TotalStorageBytes / 1024.0 / 1024.0).ToString("F1")) <span class="h4 fw-normal">MB</span></h2>
+                    <p class="text-muted small text-uppercase fw-bold letter-spacing-1 mb-0">Storage Used</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold mb-0">Recently Added</h4>
+            <a href="/Assets" class="btn btn-link link-primary p-0 text-decoration-none fw-bold small">
+                View Library <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
+        
+        @if (!RecentAssets.Any())
+        {
+            <div class="text-center py-5 bg-light rounded-4 border border-dashed">
+                <i class="bi bi-cloud-arrow-up display-3 text-muted opacity-25"></i>
+                <p class="mt-3 text-secondary">Start by uploading your first asset to see recent activity here.</p>
+            </div>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 mb-5">
+                @foreach (var asset in RecentAssets)
+                {
+                    <div class="col">
+                        <AssetCard Asset="asset" />
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .animate-fade-in {
+        animation: fadeIn 0.6s ease-out;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-float {
+        animation: float 4s ease-in-out infinite;
+    }
+    @@keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-20px); }
+    }
+    .hero-icon-container {
+        position: relative;
+        z-index: 1;
+    }
+    .hero-blob {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 15rem;
+        height: 15rem;
+        background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%);
+        z-index: -1;
+        border-radius: 50%;
+    }
+    .stat-card {
+        transition: transform 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: scale(1.02);
+    }
+    .stat-icon {
+        width: 4rem;
+        height: 4rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1rem;
+    }
+    .letter-spacing-1 {
+        letter-spacing: 0.1rem;
+    }
+    .btn-white {
+        background: white;
+        color: var(--bs-body-color);
+    }
+    .btn-white:hover {
+        background: var(--bs-light);
+    }
+</style>
+
+@code {
+    private bool Loading = true;
+    private int TotalAssets = 0;
+    private int TotalCollections = 0;
+    private long TotalStorageBytes = 0;
+    private List<Asset> RecentAssets = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        TotalAssets = await DbContext.Assets.CountAsync();
+        TotalCollections = await DbContext.Collections.CountAsync();
+        TotalStorageBytes = await DbContext.Assets.SumAsync(a => (long)a.SizeBytes);
+
+        RecentAssets = await DbContext.Assets
+            .OrderByDescending(a => a.UploadedAt)
+            .Take(4)
+            .ToListAsync();
+
+        Loading = false;
+    }
+}
+

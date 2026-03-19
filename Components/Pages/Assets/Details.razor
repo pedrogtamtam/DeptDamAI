@@ -1,0 +1,390 @@
+@page "/Assets/{Id}"
+@using DeptDam.Data
+@using DeptDam.Models
+@using DeptDam.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+@inject DeptDam.Services.Storage.IStorageProvider StorageProvider
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IAssetService AssetService
+
+<PageTitle>Asset Details - @(Asset?.OriginalFileName ?? "Loading...")</PageTitle>
+
+@if (Asset == null)
+{
+    <div class="d-flex justify-content-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading asset...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <!-- Main Content Area -->
+        <div class="col-lg-8">
+            <!-- Asset Preview Card -->
+            <div class="card border-0 bg-dark-subtle shadow-sm overflow-hidden mb-4">
+                <div class="card-body p-0 text-center d-flex align-items-center justify-content-center" style="min-height: 500px; position: relative; background-image: radial-gradient(#d1d5db 1px, transparent 1px); background-size: 20px 20px;">
+                    @if (Asset.ContentType != null && Asset.ContentType.StartsWith("image/"))
+                    {
+                        <img src="/api/media/@Asset.TenantId/@Asset.StorageKey" class="img-fluid" style="max-height: 600px; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.25);" alt="@Asset.OriginalFileName" />
+                        <AuthorizeView Roles="DAM_Admin,DAM_Contributor">
+                            <a href="/Assets/@Asset.Id/Edit" class="btn btn-dark btn-sm position-absolute top-0 end-0 m-3 shadow">
+                                <i class="bi bi-pencil-square me-1"></i> Edit Image
+                            </a>
+                        </AuthorizeView>
+                    }
+                    else
+                    {
+                        <div class="text-center p-5">
+                            <i class="bi bi-file-earmark-fill display-1 text-secondary"></i>
+                            <p class="mt-3 text-muted">No preview available for @(Asset.ContentType ?? "binary file")</p>
+                        </div>
+                    }
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center p-3 border-top">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-muted small">
+                            <i class="bi bi-hdd me-1"></i> @FormatSize(Asset.SizeBytes)
+                        </span>
+                        <span class="badge bg-light text-dark border">@Asset.ContentType?.ToUpper()</span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-danger px-3 shadow-sm" @onclick="DeleteAsset">
+                            <i class="bi bi-trash3-fill me-1"></i> Delete Permanent
+                        </button>
+                        <a href="/api/media/@Asset.TenantId/@Asset.StorageKey" target="_blank" class="btn btn-sm btn-primary px-3 shadow-sm" download="@Asset.OriginalFileName">
+                            <i class="bi bi-download me-1"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Version History Section -->
+            <div class="card border-0 shadow-sm mb-4 overflow-hidden">
+                <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2 text-primary"></i>Version History</h5>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1">@(Asset.Versions?.Count ?? 1) Versions</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">No.</th>
+                                <th>Created At</th>
+                                <th>User</th>
+                                <th>Note</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Asset.Versions == null || !Asset.Versions.Any())
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4 small">Initial upload (v1)</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var v in Asset.Versions.OrderByDescending(x => x.VersionNumber))
+                                {
+                                    <tr class="@(v.StorageKey == Asset.StorageKey ? "table-active border-start border-primary border-4" : "")">
+                                        <td class="ps-4"><strong>v@(v.VersionNumber)</strong></td>
+                                        <td class="small">@v.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                                        <td class="small">@(v.CreatedBy?.Email ?? "System")</td>
+                                        <td class="small text-truncate" style="max-width: 250px;" title="@v.VersionNote">@v.VersionNote</td>
+                                        <td class="text-end pe-4">
+                                            <div class="btn-group btn-group-sm rounded-pill overflow-hidden shadow-xs">
+                                                <a href="/api/media/@Asset.TenantId/@v.StorageKey" target="_blank" class="btn btn-outline-secondary" title="View Source">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                @if (v.StorageKey != Asset.StorageKey)
+                                                {
+                                                    <button type="button" class="btn btn-outline-warning" @onclick="() => RestoreVersion(v)" title="Restore this version">
+                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Area -->
+        <div class="col-lg-4">
+            <!-- Details Overview -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold mb-4">Lifecycle & Status</h5>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-muted x-small fw-bold text-uppercase ls-1">Workflow Status</label>
+                        <div class="dropdown">
+                            <button class="btn @WorkflowButtonClass(Asset.WorkflowState) w-100 dropdown-toggle text-start d-flex justify-content-between align-items-center" type="button" @onclick="ToggleStatusDropdown">
+                                <span><i class="bi @WorkflowIcon(Asset.WorkflowState) me-2"></i>@Asset.WorkflowState.ToString().ToUpper()</span>
+                            </button>
+                            <ul class="dropdown-menu w-100 @(ShowStatusDropdown ? "show" : "")" style="position: absolute; inset: 0px auto auto 0px; margin: 0px; transform: translate(0px, 42px);">
+                                <li><button class="dropdown-item py-2" type="button" @onclick="() => UpdateStatus(AssetWorkflowState.Approved)"><i class="bi bi-check-circle-fill text-success me-2"></i> Approve Asset</button></li>
+                                <li><button class="dropdown-item py-2" type="button" @onclick="() => UpdateStatus(AssetWorkflowState.Rejected)"><i class="bi bi-x-circle-fill text-danger me-2"></i> Reject Asset</button></li>
+                                <li><button class="dropdown-item py-2" type="button" @onclick="() => UpdateStatus(AssetWorkflowState.InReview)"><i class="bi bi-eye-fill text-warning me-2"></i> Mark In Review</button></li>
+                                <li><button class="dropdown-item py-2" type="button" @onclick="() => UpdateStatus(AssetWorkflowState.Draft)"><i class="bi bi-pencil-fill text-secondary me-2"></i> Return to Draft</button></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-muted x-small fw-bold text-uppercase ls-1">Asset Filename</label>
+                        <input type="text" class="form-control form-control-sm border-0 bg-light p-2 fw-semibold" @bind="EditModel.OriginalFileName" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-muted x-small fw-bold text-uppercase ls-1">Business Expiration</label>
+                        <input type="date" class="form-control form-control-sm border-0 bg-light p-2" @bind="EditModel.ExpiresAt" />
+                    </div>
+
+                    @foreach (var f in AllCustomFields)
+                    {
+                        <div class="mb-4">
+                            <label class="form-label text-muted x-small fw-bold text-uppercase ls-1">@f.Name</label>
+                            @if (f.FieldType == FieldType.Boolean)
+                            {
+                                <select class="form-select form-select-sm border-0 bg-light p-2" value="@GetCustomValue(f.Id)" @onchange="(e) => SetCustomValue(f.Id, e.Value?.ToString())">
+                                    <option value=""></option>
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                </select>
+                            }
+                            else if (f.FieldType == FieldType.Dropdown)
+                            {
+                                <select class="form-select form-select-sm border-0 bg-light p-2" value="@GetCustomValue(f.Id)" @onchange="(e) => SetCustomValue(f.Id, e.Value?.ToString())">
+                                    <option value=""></option>
+                                    @if (!string.IsNullOrEmpty(f.Options))
+                                    {
+                                        @foreach (var opt in f.Options.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                        {
+                                            <option value="@opt.Trim()">@opt.Trim()</option>
+                                        }
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="@GetInputType(f.FieldType)" class="form-control form-control-sm border-0 bg-light p-2" value="@GetCustomValue(f.Id)" @onchange="(e) => SetCustomValue(f.Id, e.Value?.ToString())" />
+                            }
+                        </div>
+                    }
+
+                    <div class="d-grid mt-4">
+                        <button type="button" class="btn btn-primary py-2 fw-bold" @onclick="SaveMetadata">Update Properties</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tags Section -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold mb-3">Organization Tags</h5>
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                        @foreach (var at in Asset.Tags)
+                        {
+                            <span class="badge rounded-pill bg-primary border-0 px-3 py-2 d-flex align-items-center">
+                                <i class="bi bi-hash me-1"></i>@at.Tag?.Name
+                                <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;" @onclick="() => RemoveTag(at)"></button>
+                            </span>
+                        }
+                    </div>
+                    <div class="input-group">
+                        <input type="text" class="form-control border-end-0 bg-light text-sm" @bind="NewTagName" placeholder="Add custom tag..." />
+                        <button class="btn btn-outline-primary border-start-0" type="button" @onclick="() => AddTag()"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sharing Creation Box -->
+            <div class="card border-0 shadow-sm mb-4 border-start border-4 border-success">
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold mb-3">Quick Share</h5>
+                    <div class="mb-3">
+                        <label class="form-label text-muted x-small fw-bold text-uppercase">Internal Link Label</label>
+                        <input type="text" class="form-control form-control-sm border-0 bg-light p-2" @bind="ShareLinkLabel" placeholder="e.g. Agency Review Q2" />
+                    </div>
+                    <button class="btn btn-outline-success w-100 fw-bold" @onclick="CreateShareLink"><i class="bi bi-magic me-2"></i>Generate Secure Link</button>
+                    
+                    @if (ShareLinkCreated)
+                    {
+                        <div class="mt-3">
+                            <label class="form-label text-muted x-small fw-bold text-uppercase">Generated URL</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control bg-light border-success" value="@NewShareUrl" readonly />
+                                <button class="btn btn-success" @onclick="CopyShareUrl"><i class="bi bi-clipboard"></i> Copy</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .ls-1 { letter-spacing: 0.05em; }
+    .x-small { font-size: 0.75rem; }
+    .ls-normal { letter-spacing: normal; }
+    .bg-checkered {
+        background-color: #f8fafc;
+        background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+        background-size: 24px 24px;
+    }
+    .shadow-xs { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+</style>
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    private Asset? Asset;
+    private AssetEditModel EditModel = new();
+    private string NewTagName = "";
+    private Dictionary<string, string> CustomValues = new();
+    private List<CustomField> AllCustomFields = new();
+    private List<AssetComment> Comments = new();
+    private string NewCommentBody = "";
+    private bool ShareLinkCreated;
+    private string NewShareUrl = "";
+    private string ShareLinkLabel = "";
+    private bool isReAnalyzing;
+    private bool ShowStatusDropdown;
+
+    protected override async Task OnInitializedAsync() => await LoadAsset();
+
+    private void ToggleStatusDropdown() => ShowStatusDropdown = !ShowStatusDropdown;
+
+    private async Task LoadAsset()
+    {
+        DbContext.ChangeTracker.Clear();
+        Asset = await DbContext.Assets
+            .Include(a => a.UploadedBy)
+            .Include(a => a.Versions).ThenInclude(v => v.CreatedBy)
+            .Include(a => a.Tags).ThenInclude(t => t.Tag)
+            .Include(a => a.MetadataValues)
+            .Include(a => a.ShareLinks)
+            .FirstOrDefaultAsync(a => a.Id == Id);
+
+        if (Asset != null)
+        {
+            EditModel.OriginalFileName = Asset.OriginalFileName;
+            EditModel.ExpiresAt = Asset.ExpiresAt;
+            AllCustomFields = await DbContext.CustomFields.OrderBy(f => f.Name).ToListAsync();
+            CustomValues.Clear();
+            foreach (var f in AllCustomFields) {
+                var v = Asset.MetadataValues.FirstOrDefault(m => m.CustomFieldId == f.Id);
+                CustomValues[f.Id] = v?.Value ?? "";
+            }
+            Comments = await DbContext.AssetComments.Include(c => c.Author).Where(c => c.AssetId == Asset.Id).ToListAsync();
+        }
+    }
+
+    private async Task UpdateStatus(AssetWorkflowState s)
+    {
+        if (Asset == null) return;
+        Asset.WorkflowState = s;
+        ShowStatusDropdown = false;
+        await DbContext.SaveChangesAsync();
+        await LoadAsset();
+    }
+
+    private async Task SaveMetadata()
+    {
+        if (Asset == null) return;
+        Asset.OriginalFileName = EditModel.OriginalFileName;
+        Asset.ExpiresAt = EditModel.ExpiresAt;
+        foreach (var kvp in CustomValues) {
+            var v = Asset.MetadataValues.FirstOrDefault(m => m.CustomFieldId == kvp.Key);
+            if (v == null && !string.IsNullOrEmpty(kvp.Value)) DbContext.AssetMetadataValues.Add(new AssetMetadataValue { AssetId = Asset.Id, CustomFieldId = kvp.Key, Value = kvp.Value, TenantId = TenantService.GetCurrentTenantId()! });
+            else if (v != null) { if (string.IsNullOrEmpty(kvp.Value)) DbContext.AssetMetadataValues.Remove(v); else v.Value = kvp.Value; }
+        }
+        await DbContext.SaveChangesAsync();
+        await LoadAsset();
+    }
+
+    private async Task AddTag()
+    {
+        if (Asset == null || string.IsNullOrWhiteSpace(NewTagName)) return;
+        var name = NewTagName.Trim().ToLowerInvariant();
+        var tid = TenantService.GetCurrentTenantId()!;
+        var t = await DbContext.Tags.FirstOrDefaultAsync(x => x.Name == name && x.TenantId == tid);
+        if (t == null) { t = new Tag { Name = name, TenantId = tid }; DbContext.Tags.Add(t); await DbContext.SaveChangesAsync(); }
+        if (!Asset.Tags.Any(x => x.TagId == t.Id)) { DbContext.AssetTags.Add(new AssetTag { AssetId = Asset.Id, TagId = t.Id, TenantId = tid }); await DbContext.SaveChangesAsync(); }
+        NewTagName = ""; await LoadAsset();
+    }
+
+    private async Task RemoveTag(AssetTag at) { DbContext.AssetTags.Remove(at); await DbContext.SaveChangesAsync(); await LoadAsset(); }
+    
+    private async Task CreateShareLink()
+    {
+        if (Asset == null) return;
+        var tid = TenantService.GetCurrentTenantId()!;
+        var tok = Guid.NewGuid().ToString("N");
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var uid = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        
+        DbContext.ShareLinks.Add(new ShareLink { 
+            Token = tok, 
+            AssetId = Asset.Id, 
+            TenantId = tid, 
+            CreatedById = uid, 
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(30), 
+            Label = string.IsNullOrWhiteSpace(ShareLinkLabel) ? "Public Review" : ShareLinkLabel 
+        });
+        
+        await DbContext.SaveChangesAsync();
+        NewShareUrl = $"{NavManager.BaseUri.TrimEnd('/')}/share/{tok}";
+        ShareLinkCreated = true; 
+        await LoadAsset();
+    }
+
+    private async Task RevokeShareLink(ShareLink l) { l.IsRevoked = true; await DbContext.SaveChangesAsync(); await LoadAsset(); }
+
+    private async Task CopyShareUrl() => await JS.InvokeVoidAsync("navigator.clipboard.writeText", NewShareUrl);
+    private async Task CopyDirectUrl(string tok) => await JS.InvokeVoidAsync("navigator.clipboard.writeText", $"{NavManager.BaseUri.TrimEnd('/')}/share/{tok}");
+
+    private async Task DeleteAsset() { if (Asset != null && await JS.InvokeAsync<bool>("confirm", "This will permanently delete the asset and ALL versions and comments. Are you sure?")) { await AssetService.DeleteAssetAsync(Asset.Id); NavManager.NavigateTo("/Assets"); } }
+    
+    private async Task RestoreVersion(AssetVersion v) { Asset!.StorageKey = v.StorageKey; Asset.SizeBytes = v.SizeBytes; await DbContext.SaveChangesAsync(); await LoadAsset(); }
+
+    private string FormatSize(long b) { string[] s = { "B", "KB", "MB", "GB" }; int c = 0; decimal n = b; while (Math.Round(n / 1024) >= 1) { n /= 1024; c++; } return $"{n:n1} {s[c]}"; }
+    private string GetCustomValue(string id) => CustomValues.TryGetValue(id, out var v) ? v : "";
+    private void SetCustomValue(string id, string? v) => CustomValues[id] = v ?? "";
+
+    private string GetInputType(FieldType t) => t switch {
+        FieldType.Date => "date",
+        _ => "text"
+    };
+
+    private string WorkflowButtonClass(AssetWorkflowState s) => s switch {
+        AssetWorkflowState.Approved => "btn-success",
+        AssetWorkflowState.Rejected => "btn-danger",
+        AssetWorkflowState.InReview => "btn-warning text-dark",
+        _ => "btn-secondary"
+    };
+
+    private string WorkflowIcon(AssetWorkflowState s) => s switch {
+        AssetWorkflowState.Approved => "bi-check-circle-fill",
+        AssetWorkflowState.Rejected => "bi-x-circle-fill",
+        AssetWorkflowState.InReview => "bi-eye-fill",
+        _ => "bi-pencil-fill"
+    };
+
+    public class AssetEditModel { public string OriginalFileName { get; set; } = ""; public DateTime? ExpiresAt { get; set; } }
+}

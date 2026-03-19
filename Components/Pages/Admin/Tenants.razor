@@ -1,0 +1,194 @@
+@page "/Admin/Tenants"
+@using DeptDam.Data
+@using DeptDam.Models
+@using Microsoft.EntityFrameworkCore
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SuperAdmin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> UserManager
+@inject Microsoft.AspNetCore.Identity.RoleManager<ApplicationRole> RoleManager
+
+<PageTitle>Tenant Management</PageTitle>
+
+<div class="row mb-4">
+    <div class="col">
+        <h3>SuperAdmin: Tenant Management</h3>
+        <p class="text-muted">Manage active workspaces and subdomains.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h5 class="card-title fw-bold">Register New Tenant</h5>
+                <div class="mb-3 mt-3">
+                    <label class="form-label text-muted small fw-bold">WORKSPACE NAME</label>
+                    <input type="text" class="form-control" @bind="newTenant.Name" placeholder="e.g. Acme Corp" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-bold">SUBDOMAIN</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" @bind="newTenant.Subdomain" placeholder="acme" />
+                        <span class="input-group-text bg-light text-muted">.localhost</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary w-100" @onclick="CreateTenant" disabled="@string.IsNullOrWhiteSpace(newTenant.Name)">Create Tenant</button>
+                @if (statusMessage != null)
+                {
+                    <div class="alert alert-success mt-3 py-2 small">@statusMessage</div>
+                }
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Workspace Name</th>
+                            <th>Subdomain Route</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in tenants)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold">@t.Name</td>
+                                <td><span class="badge bg-secondary">@(t.Subdomain).localhost</span></td>
+                                <td>
+                                    <div class="form-check form-switch m-0 text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@t.IsActive" @onchange="(e) => ToggleActive(t, (bool)(e.Value ?? false))" />
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTenant(t)"><i class="bi bi-trash"></i></button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Tenant> tenants = new();
+    private Tenant newTenant = new();
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTenants();
+    }
+
+    private async Task LoadTenants()
+    {
+        tenants = await DbContext.Tenants.OrderBy(t => t.Name).ToListAsync();
+    }
+
+    private async Task CreateTenant()
+    {
+        if (string.IsNullOrWhiteSpace(newTenant.Name)) return;
+        
+        newTenant.Subdomain = newTenant.Subdomain?.Trim().ToLower() ?? "";
+        DbContext.Tenants.Add(newTenant);
+        await DbContext.SaveChangesAsync();
+
+        // Setup the baseline security schema for the new isolated container
+        string[] roleNames = { "SuperAdmin", "DAM_Admin", "DAM_Contributor", "DAM_Viewer" };
+        var roleDict = new Dictionary<string, ApplicationRole>();
+        
+        foreach (var rName in roleNames)
+        {
+            var role = new ApplicationRole { Name = rName, NormalizedName = rName.ToUpperInvariant(), TenantId = newTenant.Id };
+            DbContext.Roles.Add(role);
+            roleDict[rName] = role;
+        }
+        await DbContext.SaveChangesAsync();
+
+        // Provision the master admin account across the border into the new tenant
+        var rootAdminEmail = "admin@deptdam.com";
+        var passwordHasher = new Microsoft.AspNetCore.Identity.PasswordHasher<ApplicationUser>();
+        
+        var adminUser = new ApplicationUser
+        {
+            Id = Guid.NewGuid().ToString(),
+            UserName = rootAdminEmail,
+            NormalizedUserName = rootAdminEmail.ToUpperInvariant(),
+            Email = rootAdminEmail,
+            NormalizedEmail = rootAdminEmail.ToUpperInvariant(),
+            EmailConfirmed = true,
+            TenantId = newTenant.Id,
+            SecurityStamp = Guid.NewGuid().ToString("D")
+        };
+        
+        adminUser.PasswordHash = passwordHasher.HashPassword(adminUser, "P@ssword123!");
+        
+        try
+        {
+            DbContext.Users.Add(adminUser);
+            await DbContext.SaveChangesAsync();
+            
+            DbContext.UserRoles.Add(new Microsoft.AspNetCore.Identity.IdentityUserRole<string> { UserId = adminUser.Id, RoleId = roleDict["SuperAdmin"].Id });
+            await DbContext.SaveChangesAsync();
+            
+            statusMessage = $"Tenant '{newTenant.Name}' provisioned. You can now login at {newTenant.Subdomain}.localhost:5000";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = "Tenant created, but auto-admin provisioning failed: " + ex.Message;
+        }
+
+        newTenant = new();
+        await LoadTenants();
+    }
+
+    private async Task ToggleActive(Tenant t, bool state)
+    {
+        t.IsActive = state;
+        await DbContext.SaveChangesAsync();
+        await LoadTenants();
+    }
+
+    private async Task DeleteTenant(Tenant t)
+    {
+        // Warn: This is a devastating action. Execute explicit cascading constraints on isolated tables.
+        try 
+        {
+            var tid = t.Id;
+            await DbContext.ShareLinks.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.AssetComments.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.AssetVersions.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.AssetMetadataValues.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.AssetTags.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.CollectionTags.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.Tags.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.Assets.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.Collections.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.CustomFields.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            
+            await DbContext.UserRoles.Where(x => DbContext.Users.Any(u => u.Id == x.UserId && u.TenantId == tid)).ExecuteDeleteAsync();
+            await DbContext.UserClaims.Where(x => DbContext.Users.Any(u => u.Id == x.UserId && u.TenantId == tid)).ExecuteDeleteAsync();
+            await DbContext.UserLogins.Where(x => DbContext.Users.Any(u => u.Id == x.UserId && u.TenantId == tid)).ExecuteDeleteAsync();
+            await DbContext.UserTokens.Where(x => DbContext.Users.Any(u => u.Id == x.UserId && u.TenantId == tid)).ExecuteDeleteAsync();
+            
+            await DbContext.Users.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+            await DbContext.Roles.IgnoreQueryFilters().Where(x => EF.Property<string>(x, "TenantId") == tid).ExecuteDeleteAsync();
+
+            DbContext.Tenants.Remove(t);
+            await DbContext.SaveChangesAsync();
+            statusMessage = $"Tenant '{t.Name}' was successfully purged.";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error attempting to destroy: {ex.Message}";
+        }
+        await LoadTenants();
+    }
+}

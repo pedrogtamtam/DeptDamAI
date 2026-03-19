@@ -1,0 +1,137 @@
+@inject DeptDam.Services.IAssetService AssetService
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+@using Microsoft.AspNetCore.Components.Authorization
+@using DeptDam.Models
+
+<div class="card h-100 position-relative shadow-sm border-0 asset-card">
+    @if (IsDeletable && OnRemove.HasDelegate)
+    {
+        <button class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 shadow-sm" style="z-index: 10;" title="Remove from Collection" @onclick="OnRemove">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    }
+    else
+    {
+        <AuthorizeView Roles="DAM_Admin">
+            <button class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 shadow-sm" style="z-index: 10;" title="Delete Asset" @onclick:stopPropagation="true" @onclick="DeleteAssetInternal">
+                <i class="bi bi-trash-fill"></i>
+            </button>
+        </AuthorizeView>
+    }
+
+    <!-- Workflow state badge -->
+    <div class="position-absolute top-0 start-0 m-2 d-flex gap-1" style="z-index:10;">
+        <span class="badge @StateBadgeClass" style="font-size:0.65rem;">@Asset.WorkflowState.ToString().ToUpper()</span>
+        @if (Asset.ExpiresAt.HasValue && Asset.ExpiresAt.Value < DateTime.UtcNow)
+        {
+            <span class="badge bg-danger" style="font-size:0.65rem;"><i class="bi bi-clock-history me-1"></i>EXPIRED</span>
+        }
+    </div>
+
+    <!-- AI indicator -->
+    @if (!string.IsNullOrEmpty(Asset.ExtractedText) || !string.IsNullOrEmpty(Asset.FacesDetected))
+    {
+        <div class="position-absolute top-0" style="z-index:10; right: 2.2rem; margin-top: 0.5rem;">
+            <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.6rem;" title="AI analyzed">
+                <i class="bi bi-robot"></i>
+            </span>
+        </div>
+    }
+
+    <a href="/Assets/@Asset.Id" class="text-decoration-none text-body d-flex flex-column h-100">
+        <div class="card-img-top bg-light d-flex align-items-center justify-content-center border-bottom" style="height: 160px; overflow: hidden;">
+            @if (Asset.ContentType.StartsWith("image/"))
+            {
+                <img src="/api/media/@Asset.TenantId/@Asset.StorageKey?w=400&h=300" alt="@Asset.OriginalFileName"
+                     style="max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.3s;" />
+            }
+            else
+            {
+                <i class="bi @FileIcon display-3 text-secondary opacity-25"></i>
+            }
+        </div>
+        <div class="card-body p-3 flex-grow-1 d-flex flex-column">
+            <h6 class="card-title text-truncate mb-1 fw-semibold" title="@Asset.OriginalFileName">
+                @if (!string.IsNullOrEmpty(SearchTerms) && Asset.OriginalFileName.Contains(SearchTerms, StringComparison.OrdinalIgnoreCase))
+                {
+                    var idx = Asset.OriginalFileName.IndexOf(SearchTerms, StringComparison.OrdinalIgnoreCase);
+                    @Asset.OriginalFileName[..idx]<mark>@Asset.OriginalFileName.Substring(idx, SearchTerms.Length)</mark>@Asset.OriginalFileName[(idx + SearchTerms.Length)..]
+                }
+                else
+                {
+                    @Asset.OriginalFileName
+                }
+            </h6>
+            <div class="d-flex justify-content-between align-items-center mt-auto">
+                <span class="badge bg-light text-secondary border border-secondary-subtle fw-normal" style="font-size:0.7rem;">
+                    @Asset.ContentType.Split('/').Last().ToUpper()
+                </span>
+                <span class="text-muted" style="font-size:0.75rem;">@FormatSize(Asset.SizeBytes)</span>
+            </div>
+            @if (Asset.Tags.Any())
+            {
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                    @foreach (var at in Asset.Tags.Take(3))
+                    {
+                        <span class="badge rounded-pill bg-info-subtle text-info border border-info-subtle" style="font-size:0.65rem;">@at.Tag?.Name</span>
+                    }
+                    @if (Asset.Tags.Count > 3)
+                    {
+                        <span class="badge rounded-pill bg-secondary-subtle text-secondary" style="font-size:0.65rem;">+@(Asset.Tags.Count - 3)</span>
+                    }
+                </div>
+            }
+        </div>
+    </a>
+</div>
+
+<style>
+    .asset-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .asset-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important; }
+    .asset-card:hover img { transform: scale(1.04); }
+    mark { background: #fef08a; padding: 0 2px; border-radius: 2px; }
+</style>
+
+@code {
+    [Parameter] public Asset Asset { get; set; } = null!;
+    [Parameter] public bool IsDeletable { get; set; } = false;
+    [Parameter] public EventCallback OnRemove { get; set; }
+    [Parameter] public string? SearchTerms { get; set; }
+
+    private string StateBadgeClass => Asset.WorkflowState switch
+    {
+        AssetWorkflowState.Approved => "bg-success",
+        AssetWorkflowState.Rejected => "bg-danger",
+        AssetWorkflowState.InReview => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private string FileIcon => Asset.ContentType switch
+    {
+        var c when c.StartsWith("video/") => "bi-film",
+        var c when c.StartsWith("audio/") => "bi-music-note-beamed",
+        var c when c.Contains("pdf") => "bi-file-earmark-pdf",
+        var c when c.Contains("word") => "bi-file-earmark-word",
+        var c when c.Contains("excel") || c.Contains("spreadsheet") => "bi-file-earmark-excel",
+        _ => "bi-file-earmark-fill"
+    };
+
+    private string FormatSize(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB" };
+        int counter = 0;
+        decimal number = bytes;
+        while (Math.Round(number / 1024) >= 1) { number /= 1024; counter++; }
+        return $"{number:n1} {suffixes[counter]}";
+    }
+
+    private async Task DeleteAssetInternal()
+    {
+        if (await JS.InvokeAsync<bool>("confirm", $"Delete '{Asset.OriginalFileName}' permanently?"))
+        {
+            await AssetService.DeleteAssetAsync(Asset.Id);
+            NavManager.NavigateTo(NavManager.Uri, forceLoad: true); // Refresh current view
+        }
+    }
+}

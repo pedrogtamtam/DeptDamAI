@@ -1,0 +1,157 @@
+@page "/Admin/Users"
+@using DeptDam.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using DeptDam.Services
+@attribute [Authorize(Roles = "DAM_Admin")]
+@rendermode InteractiveServer
+@inject UserManager<ApplicationUser> UserManager
+@inject ITenantService TenantService
+@inject ApplicationDbContext DbContext
+@inject ILogger<Users> Logger
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>User Management</PageTitle>
+
+<h3>User Management</h3>
+<div class="row">
+    <div class="col-md-6">
+        <h4>Invite New User</h4>
+        <EditForm Model="InviteModel" OnValidSubmit="InviteUser">
+            <DataAnnotationsValidator />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="InviteModel.Email" class="form-control" autocomplete="email" aria-required="true" placeholder="name@example.com" />
+                <label>Email address</label>
+                <ValidationMessage For="() => InviteModel.Email" class="text-danger" />
+            </div>
+            <button type="submit" class="btn btn-primary">Invite</button>
+            @if (InviteMessage != null)
+            {
+                <div class="alert alert-success mt-2">@InviteMessage</div>
+            }
+            @if (InviteError != null)
+            {
+                <div class="alert alert-danger mt-2">@InviteError</div>
+            }
+        </EditForm>
+    </div>
+    <div class="col-md-6">
+        <h4>Existing Users & Roles</h4>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in TenantUsers)
+                    {
+                        <tr>
+                            <td class="align-middle">@user.Email</td>
+                            <td class="align-middle">
+                                <span class="badge bg-info text-dark">@GetUserRole(user)</span>
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <select class="form-select form-select-sm w-auto" @onchange='(e) => ChangeRole(user, e.Value?.ToString() ?? "DAM_Viewer")'>
+                                        <option value="" disabled selected>Assign...</option>
+                                        @if (IsSuperAdmin)
+                                        {
+                                            <option value="SuperAdmin">SuperAdmin</option>
+                                        }
+                                        <option value="DAM_Admin">DAM Admin</option>
+                                        <option value="DAM_Contributor">DAM Contributor</option>
+                                        <option value="DAM_Viewer">DAM Viewer</option>
+                                    </select>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private InviteViewModel InviteModel { get; set; } = new();
+    private List<ApplicationUser> TenantUsers = new();
+    private string? InviteMessage;
+    private string? InviteError;
+    private bool IsSuperAdmin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        IsSuperAdmin = authState.User.IsInRole("SuperAdmin");
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        TenantUsers = await DbContext.Users.ToListAsync();
+        UserRoles.Clear();
+        foreach (var user in TenantUsers)
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            UserRoles[user.Id] = roles.FirstOrDefault() ?? "No Role";
+        }
+    }
+
+    private Dictionary<string, string> UserRoles = new();
+
+    private string GetUserRole(ApplicationUser user) => UserRoles.ContainsKey(user.Id) ? UserRoles[user.Id] : "Loading...";
+
+    private async Task ChangeRole(ApplicationUser user, string roleName)
+    {
+        var currentRoles = await UserManager.GetRolesAsync(user);
+        await UserManager.RemoveFromRolesAsync(user, currentRoles);
+        await UserManager.AddToRoleAsync(user, roleName);
+        await LoadUsers();
+    }
+
+    private async Task InviteUser()
+    {
+        InviteMessage = null;
+        InviteError = null;
+
+        var user = new ApplicationUser 
+        { 
+            UserName = InviteModel.Email, 
+            Email = InviteModel.Email,
+            TenantId = TenantService.GetCurrentTenantId()! 
+        };
+
+        var result = await UserManager.CreateAsync(user);
+
+        if (result.Succeeded)
+        {
+            var code = await UserManager.GeneratePasswordResetTokenAsync(user);
+            code = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(code));
+            var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+                NavigationManager.ToAbsoluteUri("Account/ResetPassword").AbsoluteUri,
+                new Dictionary<string, object?> { ["Input.Code"] = code, ["Input.Email"] = user.Email });
+
+            InviteMessage = $"User created! (Local dev only) Invite Link: {callbackUrl}";
+            
+            InviteModel = new();
+            await LoadUsers();
+        }
+        else
+        {
+            InviteError = string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+
+    public class InviteViewModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+    }
+}

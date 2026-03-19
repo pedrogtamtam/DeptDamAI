@@ -1,0 +1,41 @@
+## --- Build Outputs ---
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+
+## --- IDE Specific (Visual Studio) ---
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+.vs-code/
+
+## --- IDE Specific (VS Code) ---
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+## --- Testing ---
+TestResults/
+*.sequenced
+
+## --- Packages & Dependencies ---
+*.nuget.props
+*.nuget.targets
+packages/
+node_modules/
+
+## --- Environment & Secrets ---
+# DON'T check in local secrets or dev settings
+appsettings.Development.json
+appsettings.Local.json
+*.pfx
+*.publishsettings
+
+## --- Operating System ---
+.DS_Store
+Thumbs.db

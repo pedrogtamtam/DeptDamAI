@@ -1,0 +1,124 @@
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1;
+    min-width: 0;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar {
+    background: #ffffff;
+    border-right: 1px solid var(--border-color);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    width: 280px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+.collapsed .sidebar {
+    width: 70px;
+}
+
+@media (min-width: 768px) {
+    main {
+        margin-left: 280px;
+    }
+    
+    .collapsed main {
+        margin-left: 70px;
+    }
+
+    .sidebar-toggle-container {
+        position: fixed;
+        left: 265px; /* (sidebar width 280) - (toggle center 15) */
+        top: 25px;
+        z-index: 2000;
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: auto;
+    }
+
+    .collapsed .sidebar-toggle-container {
+        left: 55px; /* (collapsed sidebar width 70) - (toggle center 15) */
+    }
+
+    .sidebar-toggle {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        cursor: pointer;
+        outline: none;
+    }
+
+    .sidebar-toggle:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        transform: scale(1.1);
+    }
+}
+
+@media (max-width: 767.98px) {
+    .sidebar {
+        transform: translateX(-100%);
+        box-shadow: 0 0 50px rgba(0,0,0,0.5);
+    }
+    .page.show-mobile .sidebar {
+        transform: translateX(0);
+        width: 260px;
+    }
+    .sidebar-toggle-container {
+        display: none;
+    }
+}
+
+.top-row {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+    height: 4.5rem;
+    display: flex;
+    align-items: center;
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 99;
+}
+
+article.content {
+    padding: 2.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}

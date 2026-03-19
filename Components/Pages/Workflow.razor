@@ -1,0 +1,161 @@
+@page "/Workflow"
+@using DeptDam.Models
+@using DeptDam.Data
+@using DeptDam.Services
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Workflow Kanban</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 mb-1 fw-bold">Workflow Board</h1>
+        <p class="text-secondary small mb-0">Manage asset approvals and lifecycle stages.</p>
+    </div>
+</div>
+
+<div class="row g-4 kanban-container overflow-auto pb-4" style="min-height: 80vh; flex-wrap: nowrap;">
+    @foreach (var state in Enum.GetValues<AssetWorkflowState>())
+    {
+        <div class="col-12 col-md-3 kanban-column">
+            <div class="card bg-light border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0 text-uppercase letter-spacing-1">
+                        @GetStateIcon(state) @state
+                    </h6>
+                    <span class="badge bg-secondary rounded-pill">@(AssetsByState.ContainsKey(state) ? AssetsByState[state].Count : 0)</span>
+                </div>
+                <div class="card-body p-2 kanban-drop-zone" @onactivate:stopPropagation>
+                    <div class="d-flex flex-column gap-3">
+                        @if (AssetsByState.ContainsKey(state))
+                        {
+                            @foreach (var asset in AssetsByState[state])
+                            {
+                                <div class="card kanban-item border-0 shadow-sm handle" draggable="true" @onclick="() => NavigateToAsset(asset.Id)">
+                                    <div class="kanban-img-top bg-checkered d-flex align-items-center justify-content-center" style="height: 120px; overflow: hidden;">
+                                        @if (asset.ContentType.StartsWith("image/"))
+                                        {
+                                            <img src="/api/media/@asset.TenantId/@asset.StorageKey?w=200&h=120" class="img-fluid" style="object-fit: contain; max-height: 100%;" />
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-file-earmark text-secondary opacity-50 display-6"></i>
+                                        }
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <p class="small fw-bold text-truncate mb-1" title="@asset.OriginalFileName">@asset.OriginalFileName</p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted" style="font-size: 0.65rem;">@asset.UploadedAt.ToLocalTime().ToString("MMM dd")</span>
+                                            <div class="dropdown" @onclick:stopPropagation>
+                                                <button class="btn btn-link btn-sm text-dark p-0" type="button" data-bs-toggle="dropdown">
+                                                    <i class="bi bi-three-dots-vertical"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 small">
+                                                    @foreach (var targetState in Enum.GetValues<AssetWorkflowState>())
+                                                    {
+                                                        if (targetState != state)
+                                                        {
+                                                            <li><button class="dropdown-item" @onclick="() => UpdateAssetState(asset, targetState)">Move to @targetState</button></li>
+                                                        }
+                                                    }
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item" href="/Assets/@asset.Id">View Details</a></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .kanban-container::-webkit-scrollbar { height: 8px; }
+    .kanban-container::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    .kanban-column { min-width: 300px; max-width: 400px; }
+    .kanban-item { cursor: pointer; transition: transform 0.1s; }
+    .kanban-item:hover { transform: scale(1.02); }
+    .letter-spacing-1 { letter-spacing: 1px; }
+    .bg-checkered {
+        background-color: #fafafa;
+        background-image: linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee), linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee);
+        background-size: 10px 10px;
+        background-position: 0 0, 5px 5px;
+    }
+</style>
+
+@code {
+    private Dictionary<AssetWorkflowState, List<Asset>> AssetsByState = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWorkflowData();
+    }
+
+    private async Task LoadWorkflowData()
+    {
+        var allAssets = await DbContext.Assets
+            .OrderByDescending(a => a.UploadedAt)
+            .ToListAsync();
+
+        AssetsByState = allAssets
+            .GroupBy(a => a.WorkflowState)
+            .ToDictionary(g => g.Key, g => g.ToList());
+            
+        // Ensure all states exist in dictionary
+        foreach (var state in Enum.GetValues<AssetWorkflowState>())
+        {
+            if (!AssetsByState.ContainsKey(state))
+                AssetsByState[state] = new List<Asset>();
+        }
+    }
+
+    private async Task UpdateAssetState(Asset asset, AssetWorkflowState newState)
+    {
+        var oldState = asset.WorkflowState;
+        asset.WorkflowState = newState;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+
+        // Log system event
+        DbContext.AssetComments.Add(new AssetComment
+        {
+            AssetId = asset.Id,
+            TenantId = TenantService.GetCurrentTenantId()!,
+            AuthorId = userId,
+            IsSystemEvent = true,
+            EventType = "status_changed",
+            Body = $"moved asset from {oldState} to {newState} via Kanban"
+        });
+
+        await DbContext.SaveChangesAsync();
+        await LoadWorkflowData();
+    }
+
+    private void NavigateToAsset(string id)
+    {
+        @inject NavigationManager NavManager
+        NavManager.NavigateTo($"/Assets/{id}");
+    }
+
+    private RenderFragment GetStateIcon(AssetWorkflowState state) => state switch
+    {
+        AssetWorkflowState.Draft => @<i class="bi bi-pencil-square text-secondary me-2"></i>,
+        AssetWorkflowState.InReview => @<i class="bi bi-eye-fill text-warning me-2"></i>,
+        AssetWorkflowState.Approved => @<i class="bi bi-check-circle-fill text-success me-2"></i>,
+        AssetWorkflowState.Rejected => @<i class="bi bi-x-circle-fill text-danger me-2"></i>,
+        _ => @<i class="bi bi-question-circle text-muted me-2"></i>
+    };
+}

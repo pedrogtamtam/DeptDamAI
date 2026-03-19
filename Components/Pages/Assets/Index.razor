@@ -1,0 +1,483 @@
+@page "/Assets"
+@using DeptDam.Models
+@using DeptDam.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavManager
+
+<PageTitle>Asset Library — Search & Discovery</PageTitle>
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div>
+        <h1 class="h2 mb-1 fw-bold">Asset Library</h1>
+        <p class="text-secondary small mb-0">
+            @if (assets != null)
+            {
+                <span>@assets.Count of @TotalCount assets</span>
+            }
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm @(ShowFilters ? "active" : "")" @onclick="ToggleFilters">
+            <i class="bi bi-sliders me-1"></i>Filters
+            @if (HasActiveFilters)
+            {
+                <span class="badge bg-primary ms-1">@ActiveFilterCount</span>
+            }
+        </button>
+        <a href="/Assets/Upload" class="btn btn-primary px-4 d-flex align-items-center">
+            <i class="bi bi-upload me-2"></i> Upload
+        </a>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-3">
+        <div class="d-flex gap-2 align-items-center">
+            <div class="input-group input-group-lg flex-grow-1">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input id="searchInput" class="form-control border-start-0 ps-0 fs-6" type="search"
+                       placeholder="Search by filename, tag, OCR text, or metadata…"
+                       @bind="SearchQuery" @bind:event="oninput" @onkeyup="HandleKeyUp" />
+                @if (!string.IsNullOrEmpty(SearchQuery))
+                {
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                }
+                <button class="btn btn-primary" @onclick="SearchAssets">Search</button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(ActiveSearchQuery))
+        {
+            <div class="mt-2 d-flex align-items-center gap-2">
+                <small class="text-muted">Results for</small>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                    @ActiveSearchQuery 
+                    <button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.5rem;" @onclick="ClearSearch"></button>
+                </span>
+                @if (assets != null)
+                {
+                    <small class="text-muted">— @assets.Count result@(assets.Count == 1 ? "" : "s")</small>
+                }
+                <button class="btn btn-link btn-sm text-decoration-none ms-auto p-0" @onclick="SaveSearch">
+                    <i class="bi bi-bookmark-plus me-1"></i>Save Search
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Faceted Filters Panel -->
+@if (ShowFilters)
+{
+    <div class="card border-0 shadow-sm mb-3 border-top border-primary border-3">
+        <div class="card-body">
+            <div class="row g-3">
+                
+                <!-- File Type -->
+                <div class="col-md-3">
+                    <label class="form-label text-muted small fw-bold">FILE TYPE</label>
+                    <div class="d-flex flex-column gap-1">
+                        @foreach (var ft in FileTypeOptions)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ft_@ft.Key"
+                                       checked="@SelectedFileTypes.Contains(ft.Key)"
+                                       @onchange="e => ToggleFileType(ft.Key, (bool)(e.Value ?? false))" />
+                                <label class="form-check-label small" for="ft_@ft.Key">
+                                    <i class="bi @ft.Value.Icon me-1 text-muted"></i>@ft.Value.Label
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Tags -->
+                <div class="col-md-3">
+                    <label class="form-label text-muted small fw-bold">TAGS</label>
+                    <div class="d-flex flex-column gap-1" style="max-height:150px; overflow-y:auto;">
+                        @foreach (var tag in AllTags.Take(20))
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tag_@tag.Id"
+                                       checked="@SelectedTagIds.Contains(tag.Id)"
+                                       @onchange="e => ToggleTag(tag.Id, (bool)(e.Value ?? false))" />
+                                <label class="form-check-label small" for="tag_@tag.Id">@tag.Name</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="col-md-2">
+                    <label class="form-label text-muted small fw-bold">WORKFLOW STATUS</label>
+                    <div class="d-flex flex-column gap-1">
+                        @foreach (var state in Enum.GetValues<AssetWorkflowState>())
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ws_@state"
+                                       checked="@SelectedStates.Contains(state)"
+                                       @onchange="e => ToggleState(state, (bool)(e.Value ?? false))" />
+                                <label class="form-check-label small" for="ws_@state">@state</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="col-md-2">
+                    <label class="form-label text-muted small fw-bold">UPLOADED</label>
+                    <select class="form-select form-select-sm" @bind="DateRangeFilter" @bind:after="SearchAssets">
+                        <option value="">Any time</option>
+                        <option value="today">Today</option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                        <option value="90d">Last 90 days</option>
+                        <option value="year">This year</option>
+                    </select>
+                </div>
+
+                <!-- Sort -->
+                <div class="col-md-2">
+                    <label class="form-label text-muted small fw-bold">SORT BY</label>
+                    <select class="form-select form-select-sm" @bind="SortBy" @bind:after="SearchAssets">
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                        <option value="name_asc">Name A→Z</option>
+                        <option value="name_desc">Name Z→A</option>
+                        <option value="size_desc">Largest first</option>
+                        <option value="size_asc">Smallest first</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="d-flex gap-2 mt-3 pt-3 border-top">
+                <button class="btn btn-sm btn-primary" @onclick="SearchAssets">
+                    <i class="bi bi-search me-1"></i>Apply Filters
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ResetFilters">
+                    <i class="bi bi-x-circle me-1"></i>Reset
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Saved Searches -->
+@if (SavedSearches.Any())
+{
+    <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+        <small class="text-muted fw-bold"><i class="bi bi-bookmark me-1"></i>Saved:</small>
+        @foreach (var s in SavedSearches)
+        {
+            <button class="btn btn-sm btn-outline-primary rounded-pill" @onclick="() => RestoreSavedSearch(s)">
+                @s.Name
+            </button>
+            <button class="btn btn-sm btn-link text-danger p-0" title="Remove" @onclick="() => RemoveSavedSearch(s)">
+                <i class="bi bi-x"></i>
+            </button>
+        }
+    </div>
+}
+
+<!-- Save Search Dialog -->
+@if (ShowSaveSearchDialog)
+{
+    <div class="modal-backdrop-inline card border-primary shadow-sm mb-3 border-2">
+        <div class="card-body d-flex gap-2 align-items-center">
+            <i class="bi bi-bookmark-fill text-primary fs-5"></i>
+            <input type="text" class="form-control form-control-sm" placeholder="Name this search…" @bind="SaveSearchName" @bind:event="oninput" />
+            <button class="btn btn-sm btn-primary" @onclick="ConfirmSaveSearch" disabled="@string.IsNullOrWhiteSpace(SaveSearchName)">Save</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowSaveSearchDialog = false">Cancel</button>
+        </div>
+    </div>
+}
+
+<!-- Results Grid -->
+@if (assets == null)
+{
+    <div class="d-flex justify-content-center p-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else if (assets.Count == 0)
+{
+    <div class="text-center py-5 bg-light rounded-4 border border-dashed">
+        <i class="bi bi-images display-1 text-muted opacity-25 mb-4"></i>
+        <h4 class="fw-bold">No assets found</h4>
+        @if (HasActiveFilters || !string.IsNullOrEmpty(ActiveSearchQuery))
+        {
+            <p class="text-secondary mb-4">Try adjusting your search or filters.</p>
+            <button class="btn btn-outline-secondary me-2" @onclick="ResetAll">Clear All Filters</button>
+        }
+        <a href="/Assets/Upload" class="btn btn-primary">Upload First Asset</a>
+    </div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4 mb-5">
+        @foreach (var asset in assets)
+        {
+            <div class="col">
+                <AssetCard Asset="asset" SearchTerms="@ActiveSearchQuery" />
+            </div>
+        }
+    </div>
+
+    @if (assets.Count < TotalCount)
+    {
+        <div class="text-center">
+            <button class="btn btn-outline-primary px-5" @onclick="LoadMore">
+                <i class="bi bi-chevron-down me-1"></i>Load more (@(TotalCount - assets.Count) remaining)
+            </button>
+        </div>
+    }
+}
+
+<style>
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .border-dashed { border-style: dashed !important; }
+    .modal-backdrop-inline { animation: fadeIn 0.2s ease; }
+</style>
+
+@code {
+    private List<Asset>? assets;
+    private int TotalCount;
+    private int PageSize = 24;
+    private int CurrentPage = 1;
+
+    // Search
+    private string SearchQuery { get; set; } = string.Empty;
+    private string ActiveSearchQuery { get; set; } = string.Empty;
+
+    // Filters
+    private bool ShowFilters = false;
+    private HashSet<string> SelectedFileTypes = new();
+    private HashSet<string> SelectedTagIds = new();
+    private HashSet<AssetWorkflowState> SelectedStates = new();
+    private string DateRangeFilter = string.Empty;
+    private string SortBy = "newest";
+
+    // Tags
+    private List<Tag> AllTags = new();
+
+    // Saved searches
+    private bool ShowSaveSearchDialog = false;
+    private string SaveSearchName = string.Empty;
+    private List<SavedSearch> SavedSearches = new();
+
+    private bool HasActiveFilters =>
+        SelectedFileTypes.Any() || SelectedTagIds.Any() || SelectedStates.Any() || !string.IsNullOrEmpty(DateRangeFilter);
+    private int ActiveFilterCount =>
+        SelectedFileTypes.Count + SelectedTagIds.Count + SelectedStates.Count + (string.IsNullOrEmpty(DateRangeFilter) ? 0 : 1);
+
+    private static readonly Dictionary<string, (string Icon, string Label, string[] Prefixes)> FileTypeOptions = new()
+    {
+        ["image"] = ("bi-image", "Images", new[] { "image/" }),
+        ["video"] = ("bi-film", "Videos", new[] { "video/" }),
+        ["audio"] = ("bi-music-note-beamed", "Audio", new[] { "audio/" }),
+        ["document"] = ("bi-file-earmark-text", "Documents", new[] { "application/pdf", "application/msword", "application/vnd" }),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        AllTags = await DbContext.Tags.OrderBy(t => t.Name).ToListAsync();
+        await LoadAssetsAsync();
+    }
+
+    private async Task LoadAssetsAsync(bool append = false)
+    {
+        var query = DbContext.Assets
+            .Include(a => a.Tags).ThenInclude(at => at.Tag)
+            .AsQueryable();
+
+        // Full-text search across filename, OCR, EXIF, and tags
+        if (!string.IsNullOrWhiteSpace(ActiveSearchQuery))
+        {
+            var term = ActiveSearchQuery.ToLower();
+            query = query.Where(a =>
+                a.OriginalFileName.ToLower().Contains(term) ||
+                (a.ExtractedText != null && a.ExtractedText.ToLower().Contains(term)) ||
+                (a.ExifData != null && a.ExifData.ToLower().Contains(term)) ||
+                a.Tags.Any(t => t.Tag != null && t.Tag.Name.ToLower().Contains(term)));
+        }
+
+        // File type facet
+        if (SelectedFileTypes.Any())
+        {
+            query = query.Where(a => SelectedFileTypes
+                .Any(ft => FileTypeOptions.ContainsKey(ft) &&
+                     FileTypeOptions[ft].Prefixes.Any(p => a.ContentType.StartsWith(p))));
+        }
+
+        // Tag facet
+        if (SelectedTagIds.Any())
+        {
+            foreach (var tid in SelectedTagIds)
+                query = query.Where(a => a.Tags.Any(at => at.TagId == tid));
+        }
+
+        // Workflow state facet
+        if (SelectedStates.Any())
+            query = query.Where(a => SelectedStates.Contains(a.WorkflowState));
+
+        // Date range facet
+        if (!string.IsNullOrEmpty(DateRangeFilter))
+        {
+            var cutoff = DateRangeFilter switch
+            {
+                "today" => DateTime.UtcNow.Date,
+                "7d"    => DateTime.UtcNow.AddDays(-7),
+                "30d"   => DateTime.UtcNow.AddDays(-30),
+                "90d"   => DateTime.UtcNow.AddDays(-90),
+                "year"  => new DateTime(DateTime.UtcNow.Year, 1, 1),
+                _       => DateTime.MinValue
+            };
+            query = query.Where(a => a.UploadedAt >= cutoff);
+        }
+
+        TotalCount = await query.CountAsync();
+
+        // Sorting
+        query = SortBy switch
+        {
+            "oldest"    => query.OrderBy(a => a.UploadedAt),
+            "name_asc"  => query.OrderBy(a => a.OriginalFileName),
+            "name_desc" => query.OrderByDescending(a => a.OriginalFileName),
+            "size_desc" => query.OrderByDescending(a => a.SizeBytes),
+            "size_asc"  => query.OrderBy(a => a.SizeBytes),
+            _           => query.OrderByDescending(a => a.UploadedAt)
+        };
+
+        var fetched = await query.Take(PageSize * CurrentPage).ToListAsync();
+
+        if (append && assets != null)
+            assets = fetched;
+        else
+            assets = fetched;
+    }
+
+    private async Task LoadMore()
+    {
+        CurrentPage++;
+        await LoadAssetsAsync(append: true);
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SearchAssets();
+    }
+
+    private async Task SearchAssets()
+    {
+        ActiveSearchQuery = SearchQuery;
+        CurrentPage = 1;
+        await LoadAssetsAsync();
+    }
+
+    private async Task ClearSearch()
+    {
+        SearchQuery = string.Empty;
+        ActiveSearchQuery = string.Empty;
+        CurrentPage = 1;
+        await LoadAssetsAsync();
+    }
+
+    private void ToggleFilters() => ShowFilters = !ShowFilters;
+
+    private async Task ToggleFileType(string key, bool on)
+    {
+        if (on) SelectedFileTypes.Add(key); else SelectedFileTypes.Remove(key);
+        await SearchAssets();
+    }
+
+    private async Task ToggleTag(string tagId, bool on)
+    {
+        if (on) SelectedTagIds.Add(tagId); else SelectedTagIds.Remove(tagId);
+        await SearchAssets();
+    }
+
+    private async Task ToggleState(AssetWorkflowState state, bool on)
+    {
+        if (on) SelectedStates.Add(state); else SelectedStates.Remove(state);
+        await SearchAssets();
+    }
+
+    private async Task ResetFilters()
+    {
+        SelectedFileTypes.Clear();
+        SelectedTagIds.Clear();
+        SelectedStates.Clear();
+        DateRangeFilter = string.Empty;
+        SortBy = "newest";
+        await SearchAssets();
+    }
+
+    private async Task ResetAll()
+    {
+        await ResetFilters();
+        await ClearSearch();
+    }
+
+    // Saved Searches (in-memory; can be persisted to DB later)
+    private void SaveSearch()
+    {
+        ShowSaveSearchDialog = true;
+        SaveSearchName = ActiveSearchQuery;
+    }
+
+    private void ConfirmSaveSearch()
+    {
+        if (string.IsNullOrWhiteSpace(SaveSearchName)) return;
+        SavedSearches.Add(new SavedSearch
+        {
+            Name = SaveSearchName,
+            Query = ActiveSearchQuery,
+            FileTypes = SelectedFileTypes.ToList(),
+            TagIds = SelectedTagIds.ToList(),
+            States = SelectedStates.ToList(),
+            DateRange = DateRangeFilter,
+            Sort = SortBy
+        });
+        ShowSaveSearchDialog = false;
+        SaveSearchName = string.Empty;
+    }
+
+    private async Task RestoreSavedSearch(SavedSearch s)
+    {
+        SearchQuery = s.Query;
+        ActiveSearchQuery = s.Query;
+        SelectedFileTypes = s.FileTypes.ToHashSet();
+        SelectedTagIds = s.TagIds.ToHashSet();
+        SelectedStates = s.States.ToHashSet();
+        DateRangeFilter = s.DateRange;
+        SortBy = s.Sort;
+        ShowFilters = HasActiveFilters;
+        CurrentPage = 1;
+        await LoadAssetsAsync();
+    }
+
+    private void RemoveSavedSearch(SavedSearch s) => SavedSearches.Remove(s);
+
+    public class SavedSearch
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Query { get; set; } = string.Empty;
+        public List<string> FileTypes { get; set; } = new();
+        public List<string> TagIds { get; set; } = new();
+        public List<AssetWorkflowState> States { get; set; } = new();
+        public string DateRange { get; set; } = string.Empty;
+        public string Sort { get; set; } = "newest";
+    }
+}

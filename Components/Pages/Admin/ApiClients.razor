@@ -1,0 +1,124 @@
+@page "/Admin/ApiClients"
+@using DeptDam.Models
+@using DeptDam.Data
+@using DeptDam.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize(Roles = "DAM_Admin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ApiKeyService ApiKeyService
+@inject ITenantService TenantService
+
+<PageTitle>API Clients</PageTitle>
+
+<h3>API Clients</h3>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Create New API Client</div>
+            <div class="card-body">
+                <EditForm Model="NewClientModel" OnValidSubmit="CreateClient">
+                    <DataAnnotationsValidator />
+                    <div class="form-floating mb-3">
+                        <InputText @bind-Value="NewClientModel.Name" class="form-control" autocomplete="off" placeholder="Client Name" />
+                        <label>Client Name</label>
+                        <ValidationMessage For="() => NewClientModel.Name" class="text-danger" />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Generate Keys</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (NewlyGeneratedSecret != null)
+{
+    <div class="alert alert-warning mb-4">
+        <h4 class="alert-heading">Keep this safe!</h4>
+        <p>This is your Client Secret. You will <strong>never</strong> be able to see it again after changing pages.</p>
+        <hr>
+        <p class="mb-0"><strong>Client ID:</strong> <code>@NewlyGeneratedClientId</code></p>
+        <p class="mb-0 mt-2"><strong>Client Secret:</strong> <code>@NewlyGeneratedSecret</code></p>
+    </div>
+}
+
+<h4>Active Clients</h4>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Client ID</th>
+            <th>Created At</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var client in Clients)
+        {
+            <tr>
+                <td>@client.Name</td>
+                <td><code>@client.ClientId</code></td>
+                <td>@client.CreatedAt.ToLocalTime().ToString("g")</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" @onclick="() => RevokeClient(client)">Revoke</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<ApiClient> Clients = new();
+    private CreateClientViewModel NewClientModel { get; set; } = new();
+    private string? NewlyGeneratedClientId;
+    private string? NewlyGeneratedSecret;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClients();
+    }
+
+    private async Task LoadClients()
+    {
+        Clients = await DbContext.ApiClients.OrderByDescending(c => c.CreatedAt).ToListAsync();
+    }
+
+    private async Task CreateClient()
+    {
+        var keys = ApiKeyService.GenerateCredentials();
+        var hash = ApiKeyService.HashSecret(keys.ClientSecret);
+
+        var newClient = new ApiClient
+        {
+            Name = NewClientModel.Name,
+            ClientId = keys.ClientId,
+            ClientSecretHash = hash,
+            TenantId = TenantService.GetCurrentTenantId()!
+        };
+
+        DbContext.ApiClients.Add(newClient);
+        await DbContext.SaveChangesAsync();
+
+        NewlyGeneratedClientId = keys.ClientId;
+        NewlyGeneratedSecret = keys.ClientSecret;
+        NewClientModel = new();
+        
+        await LoadClients();
+    }
+
+    private async Task RevokeClient(ApiClient client)
+    {
+        DbContext.ApiClients.Remove(client);
+        await DbContext.SaveChangesAsync();
+        await LoadClients();
+    }
+
+    public class CreateClientViewModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.StringLength(50)]
+        public string Name { get; set; } = string.Empty;
+    }
+}
