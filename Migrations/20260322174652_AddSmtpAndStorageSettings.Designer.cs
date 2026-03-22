@@ -4,6 +4,7 @@ using DeptDam.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DeptDam.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260322174652_AddSmtpAndStorageSettings")]
+    partial class AddSmtpAndStorageSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -572,10 +575,6 @@ namespace DeptDam.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("AuthMethod")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<bool>("EnableSsl")
                         .HasColumnType("bit");
 
@@ -592,15 +591,6 @@ namespace DeptDam.Migrations
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("bit");
-
-                    b.Property<string>("OAuthClientId")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("OAuthClientSecret")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("OAuthTenantId")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Password")
                         .HasColumnType("nvarchar(max)");

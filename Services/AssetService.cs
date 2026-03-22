@@ -272,10 +272,16 @@ public class AssetService : IAssetService
 
         var asset = await _context.Assets
             .Include(a => a.Versions)
+            .Include(a => a.Tags)
+            .Include(a => a.MetadataValues)
+            .Include(a => a.ShareLinks)
             .FirstOrDefaultAsync(a => a.Id == assetId);
 
         if (asset != null)
         {
+            // Snapshot tag IDs before the AssetTag rows are removed
+            var tagIds = asset.Tags.Select(at => at.TagId).ToList();
+
             // Delete files from storage
             foreach (var version in asset.Versions)
             {
@@ -283,42 +289,87 @@ public class AssetService : IAssetService
             }
             await _storageProvider.DeleteFileAsync(asset.StorageKey);
 
+            // Remove comments separately (no navigation property on Asset)
+            var comments = await _context.AssetComments.Where(c => c.AssetId == assetId).ToListAsync();
+            _context.AssetComments.RemoveRange(comments);
+
+        // Remove join-table rows that use Restrict delete behavior with identifying FKs
+        _context.AssetTags.RemoveRange(asset.Tags);
+
+        var collectionAssets = await _context.CollectionAssets
+            .Where(ca => ca.AssetId == assetId).ToListAsync();
+        _context.CollectionAssets.RemoveRange(collectionAssets);
+
             _context.Assets.Remove(asset);
+            await _context.SaveChangesAsync();
+
+            // Delete tags that are no longer used by any asset
+            foreach (var tagId in tagIds)
+            {
+                var isUsedElsewhere = await _context.AssetTags.AnyAsync(at => at.TagId == tagId);
+                if (!isUsedElsewhere)
+                {
+                    var tag = await _context.Tags.FindAsync(tagId);
+                    if (tag != null) _context.Tags.Remove(tag);
+                }
+            }
             await _context.SaveChangesAsync();
         }
     }
     
     public async Task ReAnalyzeAssetAsync(string assetId)
     {
-        var asset = await _context.Assets.FirstOrDefaultAsync(a => a.Id == assetId);
+        var asset = await _context.Assets
+            .Include(a => a.Tags)
+                .ThenInclude(at => at.Tag)
+            .FirstOrDefaultAsync(a => a.Id == assetId);
         if (asset == null) return;
-        
+
         using var originalStream = await _storageProvider.GetFileStreamAsync(asset.StorageKey);
         using var ms = new MemoryStream();
         await originalStream.CopyToAsync(ms);
         ms.Position = 0;
-        
+
         var aiResult = await _aiService.AnalyzeAssetAsync(ms, asset.OriginalFileName);
-        
+
         asset.ExtractedText = aiResult.ExtractedText;
         asset.FacesDetected = aiResult.FacesDetected.Any() ? string.Join(", ", aiResult.FacesDetected) : null;
-        
-        // Update tags
+
         var tenantId = _tenantService.GetCurrentTenantId()!;
-        foreach (var tagName in aiResult.Tags.Distinct())
+        var newTagNames = aiResult.Tags.Distinct(StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Remove AssetTags no longer returned by AI; delete the Tag itself if it becomes orphaned
+        var tagsToRemove = asset.Tags
+            .Where(at => at.Tag != null && !newTagNames.Contains(at.Tag.Name))
+            .ToList();
+        foreach (var assetTag in tagsToRemove)
         {
-            if (!asset.Tags.Any(at => at.Tag?.Name == tagName))
-            {
-                var tag = await _context.Tags.FirstOrDefaultAsync(t => t.TenantId == tenantId && t.Name == tagName);
-                if (tag == null)
-                {
-                    tag = new Models.Tag { TenantId = tenantId, Name = tagName };
-                    _context.Tags.Add(tag);
-                }
-                asset.Tags.Add(new AssetTag { TenantId = tenantId, Tag = tag, Asset = asset });
-            }
+            _context.AssetTags.Remove(assetTag);
+            var isUsedElsewhere = await _context.AssetTags
+                .AnyAsync(at => at.TagId == assetTag.TagId && at.AssetId != assetId);
+            if (!isUsedElsewhere && assetTag.Tag != null)
+                _context.Tags.Remove(assetTag.Tag);
         }
-        
+
+        // Flush deletions so the change tracker is clean before adding new links
+        await _context.SaveChangesAsync();
+
+        // Add tags that are new (query DB instead of stale in-memory collection)
+        foreach (var tagName in newTagNames)
+        {
+            var alreadyLinked = await _context.AssetTags
+                .AnyAsync(at => at.AssetId == assetId && at.Tag!.Name == tagName);
+            if (alreadyLinked) continue;
+
+            var tag = await _context.Tags.FirstOrDefaultAsync(t => t.TenantId == tenantId && t.Name == tagName);
+            if (tag == null)
+            {
+                tag = new Models.Tag { TenantId = tenantId, Name = tagName };
+                _context.Tags.Add(tag);
+            }
+            _context.AssetTags.Add(new AssetTag { TenantId = tenantId, AssetId = assetId, TagId = tag.Id });
+        }
+
         await _context.SaveChangesAsync();
     }
 }

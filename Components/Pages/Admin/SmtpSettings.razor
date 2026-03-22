@@ -1,0 +1,312 @@
+@page "/Admin/SmtpSettings"
+@using DeptDam.Data
+@using DeptDam.Models
+@using DeptDam.Services
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+@inject IEmailService EmailService
+
+<PageTitle>Email Configuration</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-envelope-fill me-2 text-primary"></i>Email Configuration</h1>
+        <p class="text-secondary small mb-0">Configure email delivery for confirmation emails and password resets.</p>
+    </div>
+</div>
+
+@if (showAlert)
+{
+    <div class="alert alert-@alertClass alert-dismissible fade show" role="alert">
+        @alertMessage
+        <button type="button" class="btn-close" @onclick="() => showAlert = false"></button>
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-0">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-gear-fill text-warning me-2"></i>Server Settings</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-muted text-uppercase">Method</label>
+                    <select class="form-select" @bind="settings.AuthMethod">
+                        <option value="Basic">SMTP – Basic (Username &amp; Password)</option>
+                    </select>
+                </div>
+
+                @if (settings.AuthMethod == "Basic")
+                {
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Quick Setup</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger @(activePreset == "gmail" ? "active" : "")" @onclick='() => ApplyPreset("gmail")'>
+                                <i class="bi bi-google me-1"></i> Gmail
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary @(activePreset == "custom" ? "active" : "")" @onclick='() => ApplyPreset("custom")'>
+                                <i class="bi bi-sliders me-1"></i> Custom
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (activePreset == "gmail")
+                    {
+                        <div class="alert alert-danger small mb-3 py-2">
+                            <i class="bi bi-google me-1"></i>
+                            <strong>Gmail requires an App Password</strong> — your regular password won't work.
+                            <a href="https://myaccount.google.com/apppasswords" target="_blank" class="alert-link">Generate one here</a>
+                            (requires 2-Step Verification to be enabled on your Google account).
+                        </div>
+                    }
+                }
+
+                @if (settings.AuthMethod == "Basic")
+                {
+                    <div class="row mb-3">
+                        <div class="col-8">
+                            <label class="form-label fw-bold small text-muted text-uppercase">SMTP Host</label>
+                            <input type="text" class="form-control" @bind="settings.Host" placeholder="smtp.gmail.com" />
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Port</label>
+                            <input type="number" class="form-control" @bind="settings.Port" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enableSsl" @bind="settings.EnableSsl" />
+                            <label class="form-check-label fw-semibold" for="enableSsl">Enable SSL/TLS</label>
+                        </div>
+                    </div>
+                }
+
+                <hr class="my-4" />
+                <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2"></i>Credentials</h6>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase">Username</label>
+                    <input type="text" class="form-control" @bind="settings.Username" placeholder="user@example.com" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase">Password</label>
+                    <div class="input-group">
+                        <input type="@(showPassword ? "text" : "password")" class="form-control font-monospace" @bind="settings.Password" placeholder="••••••••" />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="() => showPassword = !showPassword">
+                            <i class="bi bi-@(showPassword ? "eye-slash" : "eye")"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <hr class="my-4" />
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase">From Email</label>
+                    <input type="email" class="form-control" @bind="settings.FromEmail" placeholder="noreply@example.com" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase">From Display Name</label>
+                    <input type="text" class="form-control" @bind="settings.FromName" placeholder="DeptDAM" />
+                </div>
+
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="enableSmtp" @bind="settings.IsEnabled" />
+                        <label class="form-check-label fw-semibold" for="enableSmtp">Enable email sending</label>
+                    </div>
+                    <small class="text-muted ms-5">When disabled, emails will be silently skipped.</small>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary px-4" @onclick="SaveSettings">
+                        <i class="bi bi-save me-1"></i> Save Configuration
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="TestConnection" disabled="@isTesting">
+                        @if (isTesting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-lightning-charge me-1"></i>
+                        }
+                        Send Test Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>About Email Settings</h6>
+                <ul class="list-unstyled small text-muted">
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Confirmation emails:</strong> Sent when a user registers</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Password resets:</strong> Sent when a user requests a password reset</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Per-tenant:</strong> Each workspace uses its own email settings</li>
+                    <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Test email:</strong> Sends a test to the From address</li>
+                    <li class="mb-2"><i class="bi bi-google text-danger me-2"></i><strong>Gmail:</strong> Use <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password</a>, not your Google password</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-shield-check text-success me-2"></i>Status</h6>
+                @if (!settings.IsEnabled || string.IsNullOrWhiteSpace(settings.Host))
+                {
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-warning text-dark me-2">Not Configured</span>
+                        <small class="text-muted">Emails will not be sent</small>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success me-2">Configured</span>
+                        <small class="text-muted">SMTP active</small>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Server: <strong>@settings.Host:@settings.Port</strong></small><br />
+                        <small class="text-muted">SSL: <strong>@(settings.EnableSsl ? "ON" : "OFF")</strong></small><br />
+                        <small class="text-muted">Auth: <strong>@settings.AuthMethod</strong></small><br />
+                        <small class="text-muted">From: <strong>@settings.FromEmail</strong></small><br />
+                        <small class="text-muted">Last updated: <strong>@settings.UpdatedAt.ToLocalTime().ToString("g")</strong></small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private DeptDam.Models.SmtpSettings settings = new();
+    private bool showPassword;
+    private bool isTesting;
+    private bool showAlert;
+    private string alertMessage = "";
+    private string alertClass = "success";
+    private string activePreset = "custom";
+
+    private static Dictionary<string, (string Host, int Port, bool Ssl)>? _presets;
+    private static Dictionary<string, (string Host, int Port, bool Ssl)> Presets =>
+        _presets ??= new()
+        {
+            ["gmail"]  = ("smtp.gmail.com", 587, true),
+            ["custom"] = ("",               587, true),
+        };
+
+    private void ApplyPreset(string preset)
+    {
+        activePreset = preset;
+        if (!Presets.TryGetValue(preset, out var p)) return;
+        if (!string.IsNullOrEmpty(p.Host)) settings.Host = p.Host;
+        settings.Port   = p.Port;
+        settings.EnableSsl = p.Ssl;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tid = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tid)) return;
+
+        var existing = await DbContext.SmtpSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.TenantId == tid);
+        if (existing != null)
+        {
+            settings = existing;
+        }
+        else
+        {
+            settings.TenantId = tid;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        var tid = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tid)) return;
+
+        settings.UpdatedAt = DateTime.UtcNow;
+        settings.TenantId = tid;
+
+        var existing = await DbContext.SmtpSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.TenantId == tid);
+        if (existing == null)
+        {
+            DbContext.SmtpSettings.Add(settings);
+        }
+        else
+        {
+            existing.Host = settings.Host;
+            existing.Port = settings.Port;
+            existing.EnableSsl = settings.EnableSsl;
+            existing.AuthMethod = settings.AuthMethod;
+            existing.Username = settings.Username;
+            existing.Password = settings.Password;
+            existing.OAuthTenantId = settings.OAuthTenantId;
+            existing.OAuthClientId = settings.OAuthClientId;
+            existing.OAuthClientSecret = settings.OAuthClientSecret;
+            existing.FromEmail = settings.FromEmail;
+            existing.FromName = settings.FromName;
+            existing.IsEnabled = settings.IsEnabled;
+            existing.UpdatedAt = settings.UpdatedAt;
+        }
+
+        await DbContext.SaveChangesAsync();
+        Notify("? SMTP settings saved successfully.", "success");
+    }
+
+    private async Task TestConnection()
+    {
+        if (string.IsNullOrWhiteSpace(settings.Host))
+        {
+            Notify("Please fill in the SMTP host first.", "warning");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.FromEmail))
+        {
+            Notify("Please fill in the From email first.", "warning");
+            return;
+        }
+
+        // Save first so the email service can pick up the settings
+        await SaveSettings();
+
+        isTesting = true;
+        try
+        {
+            var success = await EmailService.TestConnectionAsync();
+            if (success)
+                Notify("? Test email sent successfully! Check the inbox for " + settings.FromEmail, "success");
+            else
+                Notify("SMTP is not enabled or not configured.", "warning");
+        }
+        catch (Exception ex)
+        {
+            Notify("? SMTP test failed: " + ex.Message, "danger");
+        }
+        finally
+        {
+            isTesting = false;
+        }
+    }
+
+    private void Notify(string msg, string cls)
+    {
+        alertMessage = msg;
+        alertClass = cls;
+        showAlert = true;
+    }
+}

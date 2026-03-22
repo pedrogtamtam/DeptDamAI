@@ -3,16 +3,16 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    background-color: #ffffff;
+    background-color: #111111;
     overflow: hidden;
 }
 
 .top-row {
     min-height: 4.5rem;
-    background-color: #ffffff;
+    background-color: #111111;
     display: flex;
     align-items: center;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid #333333;
     padding: 0 1.5rem;
     overflow: hidden;
 }
@@ -20,9 +20,22 @@
 .navbar-brand {
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--primary) !important;
+    color: #ffffff !important;
     text-decoration: none;
     white-space: nowrap;
+}
+
+.dept-logo {
+    height: 28px;
+    width: auto;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+.collapsed .dept-logo {
+    opacity: 0;
+    width: 0;
+    visibility: hidden;
 }
 
 .brand-text {
@@ -59,7 +72,7 @@
 }
 
 .nav-item ::deep .nav-link {
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.65);
     background: none;
     border: none;
     border-radius: 12px;
@@ -76,14 +89,14 @@
 }
 
 .nav-item ::deep .nav-link:hover {
-    background-color: var(--primary-subtle);
-    color: var(--primary);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
 }
 
 .nav-item ::deep .nav-link.active {
-    background-color: var(--primary);
-    color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    background-color: #ffffff;
+    color: #111111 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .nav-item ::deep .nav-link span.bi {
@@ -121,9 +134,9 @@
     width: 4px;
 }
 .nav-scrollable::-webkit-scrollbar-thumb {
-    background: #e2e8f0;
+    background: #333333;
     border-radius: 10px;
 }
 .nav-scrollable::-webkit-scrollbar-thumb:hover {
-    background: #cbd5e1;
+    background: #555555;
 }

@@ -59,7 +59,7 @@ public class LocalFileSystemStorageProvider : IStorageProvider
             throw new FileNotFoundException($"File not found: {storageKey}");
         }
 
-        Stream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        Stream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         return Task.FromResult(stream);
     }
 

@@ -2,16 +2,16 @@
     --primary: #2563eb;
     --primary-hover: #1d4ed8;
     --primary-subtle: rgba(37, 99, 235, 0.08);
-    --bg-color: #f8fafc;
+    --bg-color: #f9f9f9;
     --bg-surface: #ffffff;
-    --bg-elevated: #f1f5f9;
-    --bg-dark: #0f172a;
-    --text-color: #1e293b;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
-    --border-color: #e2e8f0;
-    --border-hover: #cbd5e1;
-    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --bg-elevated: #f0f0f0;
+    --bg-dark: #111111;
+    --text-color: #111111;
+    --text-secondary: #444444;
+    --text-muted: #888888;
+    --border-color: #d4d4d4;
+    --border-hover: #aaaaaa;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
     --success: #10b981;
     --danger: #ef4444;
     --warning: #f59e0b;
@@ -44,7 +44,7 @@ body {
 
 .card-header,
 .card-footer {
-    background: #f8fafc !important;
+    background: #f0f0f0 !important;
     border-color: var(--border-color) !important;
 }
 
@@ -74,13 +74,13 @@ h6 {
 }
 
 a {
-    color: #60a5fa;
+    color: #111111;
     text-decoration: none;
     transition: color 0.15s ease;
 }
 
 a:hover {
-    color: #93bbfd;
+    color: #444444;
 }
 
 /* Buttons */
@@ -154,8 +154,8 @@ a:hover {
 .form-control:focus,
 .form-select:focus {
     background-color: var(--bg-color) !important;
-    border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px var(--primary-subtle) !important;
+    border-color: #111111 !important;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08) !important;
     color: var(--text-color) !important;
 }
 
@@ -176,7 +176,7 @@ a:hover {
 }
 
 .form-range::-webkit-slider-thumb {
-    background: var(--primary);
+    background: #111111;
 }
 
 /* Tables */
@@ -194,7 +194,7 @@ a:hover {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    background-color: #f8fafc;
+    background-color: #f0f0f0;
 }
 
 .table td {
@@ -288,7 +288,7 @@ h1:focus {
 }
 
 .validation-message {
-    color: #f87171;
+    color: var(--danger);
     font-size: 0.8125rem;
 }
 
@@ -336,7 +336,7 @@ h1:focus {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #4b5563;
+    background: #888888;
 }
 
 /* Form floating overrides for dark */
@@ -352,7 +352,7 @@ h1:focus {
 }
 
 .darker-border-checkbox.form-check-input {
-    border-color: #4b5563;
+    border-color: #888888;
 }
 
 /* Code blocks */
@@ -361,5 +361,5 @@ code {
     padding: 0.15em 0.4em;
     border-radius: 4px;
     font-size: 0.85em;
-    color: #fbbf24;
+    color: #111111;
 }

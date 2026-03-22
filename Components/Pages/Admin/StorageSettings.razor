@@ -1,0 +1,231 @@
+@page "/Admin/StorageSettings"
+@using DeptDam.Data
+@using DeptDam.Models
+@using DeptDam.Services
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@using Azure.Storage.Blobs
+@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+
+<PageTitle>Storage Configuration</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-cloud-arrow-up-fill me-2 text-primary"></i>Storage Configuration</h1>
+        <p class="text-secondary small mb-0">Configure where asset files are stored — local disk or Azure Blob Storage.</p>
+    </div>
+</div>
+
+@if (showAlert)
+{
+    <div class="alert alert-@alertClass alert-dismissible fade show" role="alert">
+        @alertMessage
+        <button type="button" class="btn-close" @onclick="() => showAlert = false"></button>
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-0">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-hdd-fill text-warning me-2"></i>Storage Provider</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-muted text-uppercase">Provider Type</label>
+                    <select class="form-select" @bind="settings.ProviderType">
+                        <option value="Local">Local File System</option>
+                        <option value="AzureBlob">Azure Blob Storage</option>
+                    </select>
+                    <small class="text-muted">Choose where uploaded assets are stored.</small>
+                </div>
+
+                @if (settings.ProviderType == "AzureBlob")
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Connection String</label>
+                        <div class="input-group">
+                            <input type="@(showConnectionString ? "text" : "password")"
+                                   class="form-control font-monospace small"
+                                   @bind="settings.AzureBlobConnectionString"
+                                   placeholder="DefaultEndpointsProtocol=https;AccountName=..." />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => showConnectionString = !showConnectionString">
+                                <i class="bi bi-@(showConnectionString ? "eye-slash" : "eye")"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Your connection string is stored securely in the database.</small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Container Name</label>
+                        <input type="text" class="form-control" @bind="settings.AzureBlobContainerName" placeholder="assets" />
+                        <small class="text-muted">The container will be created automatically if it does not exist.</small>
+                    </div>
+                }
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary px-4" @onclick="SaveSettings">
+                        <i class="bi bi-save me-1"></i> Save Configuration
+                    </button>
+                    @if (settings.ProviderType == "AzureBlob")
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="TestConnection" disabled="@isTesting">
+                            @if (isTesting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-lightning-charge me-1"></i>
+                            }
+                            Test Connection
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>Storage Options</h6>
+                <ul class="list-unstyled small text-muted">
+                    <li class="mb-2"><i class="bi bi-hdd-fill text-secondary me-2"></i><strong>Local File System:</strong> Files stored on the server disk under App_Data</li>
+                    <li class="mb-2"><i class="bi bi-cloud-fill text-info me-2"></i><strong>Azure Blob Storage:</strong> Scalable cloud storage for production workloads</li>
+                    <li class="mb-2"><i class="bi bi-shield-check text-success me-2"></i><strong>Per-tenant:</strong> Each workspace can use a different storage provider</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3"><i class="bi bi-shield-check text-success me-2"></i>Status</h6>
+                @if (settings.ProviderType == "Local")
+                {
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-secondary me-2">Local</span>
+                        <small class="text-muted">Using local file system</small>
+                    </div>
+                }
+                else if (string.IsNullOrWhiteSpace(settings.AzureBlobConnectionString))
+                {
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-warning text-dark me-2">Not Configured</span>
+                        <small class="text-muted">Azure Blob selected but no connection string</small>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success me-2">Configured</span>
+                        <small class="text-muted">Azure Blob Storage active</small>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Container: <strong>@settings.AzureBlobContainerName</strong></small><br />
+                        <small class="text-muted">Last updated: <strong>@settings.UpdatedAt.ToLocalTime().ToString("g")</strong></small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private DeptDam.Models.StorageSettings settings = new();
+    private bool showConnectionString;
+    private bool isTesting;
+    private bool showAlert;
+    private string alertMessage = "";
+    private string alertClass = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tid = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tid)) return;
+
+        var existing = await DbContext.StorageSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.TenantId == tid);
+        if (existing != null)
+        {
+            settings = existing;
+        }
+        else
+        {
+            settings.TenantId = tid;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        var tid = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tid)) return;
+
+        settings.UpdatedAt = DateTime.UtcNow;
+        settings.TenantId = tid;
+
+        var existing = await DbContext.StorageSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.TenantId == tid);
+        if (existing == null)
+        {
+            DbContext.StorageSettings.Add(settings);
+        }
+        else
+        {
+            existing.ProviderType = settings.ProviderType;
+            existing.AzureBlobConnectionString = settings.AzureBlobConnectionString;
+            existing.AzureBlobContainerName = settings.AzureBlobContainerName;
+            existing.UpdatedAt = settings.UpdatedAt;
+        }
+
+        await DbContext.SaveChangesAsync();
+        Notify("? Storage settings saved successfully.", "success");
+    }
+
+    private async Task TestConnection()
+    {
+        if (string.IsNullOrWhiteSpace(settings.AzureBlobConnectionString) || string.IsNullOrWhiteSpace(settings.AzureBlobContainerName))
+        {
+            Notify("Please fill in the connection string and container name first.", "warning");
+            return;
+        }
+
+        isTesting = true;
+        try
+        {
+            var serviceClient = new BlobServiceClient(settings.AzureBlobConnectionString);
+            var containerClient = serviceClient.GetBlobContainerClient(settings.AzureBlobContainerName);
+
+            // Try to create the container (or confirm it exists)
+            await containerClient.CreateIfNotExistsAsync();
+
+            // Verify access by listing (max 1 blob)
+            await foreach (var _ in containerClient.GetBlobsAsync().AsPages(pageSizeHint: 1))
+            {
+                break;
+            }
+
+            Notify($"? Connection successful! Container '{settings.AzureBlobContainerName}' is accessible.", "success");
+        }
+        catch (Exception ex)
+        {
+            Notify("? Connection failed: " + ex.Message, "danger");
+        }
+        finally
+        {
+            isTesting = false;
+        }
+    }
+
+    private void Notify(string msg, string cls)
+    {
+        alertMessage = msg;
+        alertClass = cls;
+        showAlert = true;
+    }
+}

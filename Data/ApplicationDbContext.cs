@@ -32,6 +32,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<ShareLink> ShareLinks { get; set; }
     public DbSet<AssetComment> AssetComments { get; set; }
     public DbSet<AiSettings> AiSettings { get; set; }
+    public DbSet<SmtpSettings> SmtpSettings { get; set; }
+    public DbSet<StorageSettings> StorageSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -19,7 +19,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IAssetService, AssetService>();
-builder.Services.AddScoped<DeptDam.Services.Storage.IStorageProvider, DeptDam.Services.Storage.LocalFileSystemStorageProvider>();
+builder.Services.AddScoped<DeptDam.Services.Storage.IStorageProvider, DeptDam.Services.Storage.StorageProviderFactory>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IAiAnalysisService, GoogleAiAnalysisService>();
 builder.Services.AddScoped<IWatermarkService, WatermarkService>();
@@ -67,7 +67,8 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     .AddClaimsPrincipalFactory<ApplicationUserClaimsPrincipalFactory>()
     .AddDefaultTokenProviders();
 
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<IEmailSender<ApplicationUser>, SmtpIdentityEmailSender>();
 
 var app = builder.Build();
 
