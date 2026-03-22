@@ -19,6 +19,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IAssetService, AssetService>();
+builder.Services.AddScoped<IBrandingService, BrandingService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<DeptDam.Services.Storage.IStorageProvider, DeptDam.Services.Storage.StorageProviderFactory>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IAiAnalysisService, GoogleAiAnalysisService>();
@@ -53,6 +55,8 @@ builder.Services.AddAuthentication()
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+    options.UseSqlServer(connectionString), ServiceLifetime.Scoped);
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>

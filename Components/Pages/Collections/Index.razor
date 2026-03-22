@@ -6,13 +6,15 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject ApplicationDbContext DbContext
+@inject DeptDam.Services.IBrandingService BrandingService
+@implements IDisposable
 
 <PageTitle>Collections</PageTitle>
 
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-5 animate-fade-in">
     <div>
-        <h1 class="h2 mb-1 fw-bold">Collections</h1>
-        <p class="text-secondary small mb-0">Group and share your assets through static or dynamic collections.</p>
+        <h1 class="h2 mb-1 fw-bold">@branding.PageCollectionsHeading</h1>
+        <p class="text-secondary small mb-0">@branding.PageCollectionsSubheading</p>
     </div>
     <a href="/Collections/Create" class="btn btn-primary px-4 d-flex align-items-center">
         <i class="bi bi-plus-lg me-2"></i> Create New
@@ -115,18 +117,32 @@ else
 </style>
 
 @code {
-    @inject NavigationManager NavigationManager
-    private List<Collection>? collectionsList;
+@inject NavigationManager NavigationManager
+private DeptDam.Models.BrandingSettings branding = new();
+private List<Collection>? collectionsList;
 
-    protected override async Task OnInitializedAsync()
-    {
-        collectionsList = await DbContext.Collections
-            .Include(c => c.CreatedBy)
-            .Include(c => c.Assets)
-            .Include(c => c.DynamicTags)
-            .OrderByDescending(c => c.CreatedAt)
-            .ToListAsync();
-    }
+protected override async Task OnInitializedAsync()
+{
+    branding = await BrandingService.GetAsync();
+    BrandingService.OnChanged += HandleBrandingChanged;
+    collectionsList = await DbContext.Collections
+        .Include(c => c.CreatedBy)
+        .Include(c => c.Assets)
+        .Include(c => c.DynamicTags)
+        .OrderByDescending(c => c.CreatedAt)
+        .ToListAsync();
+}
+
+private void HandleBrandingChanged(DeptDam.Models.BrandingSettings updated)
+{
+    branding = updated;
+    InvokeAsync(StateHasChanged);
+}
+
+public void Dispose()
+{
+    BrandingService.OnChanged -= HandleBrandingChanged;
+}
 
     private void NavigateToDetail(string id)
     {

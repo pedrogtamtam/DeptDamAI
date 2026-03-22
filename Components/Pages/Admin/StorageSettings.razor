@@ -66,6 +66,20 @@
                     </div>
                 }
 
+
+                @* ?? CDN ??????????????????????????????????????????????????????????? *@
+                <hr class="my-4" />
+                <h6 class="fw-bold mb-3"><i class="bi bi-speedometer2 text-info me-2"></i>CDN Delivery</h6>
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-muted text-uppercase">CDN Base URL</label>
+                    <input type="url" class="form-control" @bind="settings.CdnBaseUrl"
+                           placeholder="https://cdn.example.com" />
+                    <div class="form-text">
+                        When set, public asset URLs are served as <code>{cdn}/{tenantId}/{key}</code>
+                        instead of going through the local media controller. Leave blank to use the default media endpoint.
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button class="btn btn-primary px-4" @onclick="SaveSettings">
                         <i class="bi bi-save me-1"></i> Save Configuration
@@ -180,6 +194,7 @@
             existing.ProviderType = settings.ProviderType;
             existing.AzureBlobConnectionString = settings.AzureBlobConnectionString;
             existing.AzureBlobContainerName = settings.AzureBlobContainerName;
+            existing.CdnBaseUrl = settings.CdnBaseUrl;
             existing.UpdatedAt = settings.UpdatedAt;
         }
 

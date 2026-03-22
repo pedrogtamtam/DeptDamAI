@@ -13,6 +13,7 @@
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IAssetService AssetService
+@inject IEmailService EmailService
 
 <PageTitle>Asset Details - @(Asset?.OriginalFileName ?? "Loading...")</PageTitle>
 
@@ -63,6 +64,32 @@ else
                         <a href="/api/media/@Asset.TenantId/@Asset.StorageKey" target="_blank" class="btn btn-sm btn-primary px-3 shadow-sm" download="@Asset.OriginalFileName">
                             <i class="bi bi-download me-1"></i> Download
                         </a>
+                        @if (downloadPresets.Any())
+                        {
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle px-2 shadow-sm" data-bs-toggle="dropdown">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 small">
+                                    <li><h6 class="dropdown-header">Download as…</h6></li>
+                                    @foreach (var preset in downloadPresets)
+                                    {
+                                        var q = preset.Format == "original" ? "" : $"&format={preset.Format}&q={preset.Quality}";
+                                        var w = preset.Width.HasValue ? $"&w={preset.Width}" : "";
+                                        var h = preset.Height.HasValue ? $"&h={preset.Height}" : "";
+                                        <li>
+                                            <a class="dropdown-item" href="/api/media/@Asset.TenantId/@Asset.StorageKey?@($"{w}{h}{q}".TrimStart('&'))" target="_blank" download>
+                                                <i class="bi bi-file-earmark-arrow-down me-1"></i>@preset.Name
+                                                @if (preset.Width.HasValue || preset.Height.HasValue)
+                                                {
+                                                    <small class="text-muted ms-1">(@(preset.Width?.ToString() ?? "auto")×@(preset.Height?.ToString() ?? "auto"))</small>
+                                                }
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -118,6 +145,56 @@ else
                             }
                         </tbody>
                     </table>
+        </div>
+        </div>
+
+            <!-- Activity & Comments -->
+            <div class="card border-0 shadow-sm mb-4 overflow-hidden">
+                <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-chat-dots me-2 text-primary"></i>Activity &amp; Comments</h5>
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1">@Comments.Count(c => !c.IsSystemEvent) comments</span>
+                </div>
+                <div class="card-body p-4">
+                    @* Comment thread *@
+                    @foreach (var c in Comments.OrderBy(x => x.CreatedAt))
+                    {
+                        @if (c.IsSystemEvent)
+                        {
+                            <div class="d-flex align-items-center gap-2 mb-3 small text-muted">
+                                <i class="bi bi-arrow-right-circle-fill text-primary opacity-50"></i>
+                                <span>@c.Body</span>
+                                <span class="ms-auto text-nowrap">@c.CreatedAt.ToLocalTime().ToString("MMM dd HH:mm")</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-4">
+                                <div class="d-flex align-items-start gap-2">
+                                    <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:32px;height:32px;font-size:0.75rem;font-weight:700;">
+                                        @((c.Author?.UserName ?? "?").Substring(0, 1).ToUpper())
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                            <span class="fw-semibold small">@(c.Author?.UserName ?? "Unknown")</span>
+                                            <span class="text-muted x-small">@c.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</span>
+                                        </div>
+                                        <div class="bg-light rounded-3 p-3 small">@((MarkupString)RenderMentions(c.Body))</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+
+                    @* New comment input *@
+                    <div class="mt-3 border-top pt-3">
+                        <div class="form-text mb-1 small text-muted">Use <code>@("@username")</code> to mention a colleague — they'll receive an email notification.</div>
+                        <textarea class="form-control mb-2" rows="2" @bind="NewCommentBody"
+                                  placeholder="Add a comment or @@mention someone…"></textarea>
+                        <button class="btn btn-primary btn-sm px-4" @onclick="AddComment"
+                                disabled="@string.IsNullOrWhiteSpace(NewCommentBody)">
+                            <i class="bi bi-send me-1"></i> Post
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -264,6 +341,7 @@ else
     private string ShareLinkLabel = "";
     private bool isReAnalyzing;
     private bool ShowStatusDropdown;
+    private List<DeptDam.Models.DownloadPreset> downloadPresets = new();
 
     protected override async Task OnInitializedAsync() => await LoadAsset();
 
@@ -291,6 +369,12 @@ else
                 CustomValues[f.Id] = v?.Value ?? "";
             }
             Comments = await DbContext.AssetComments.Include(c => c.Author).Where(c => c.AssetId == Asset.Id).ToListAsync();
+            var tid = TenantService.GetCurrentTenantId();
+            downloadPresets = string.IsNullOrEmpty(tid) ? new() : await DbContext.DownloadPresets
+                .IgnoreQueryFilters()
+                .Where(p => p.TenantId == tid)
+                .OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
+                .ToListAsync();
         }
     }
 
@@ -355,6 +439,66 @@ else
     }
 
     private async Task RevokeShareLink(ShareLink l) { l.IsRevoked = true; await DbContext.SaveChangesAsync(); await LoadAsset(); }
+
+    private async Task AddComment()
+    {
+        if (Asset == null || string.IsNullOrWhiteSpace(NewCommentBody)) return;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var tid = TenantService.GetCurrentTenantId()!;
+
+        var comment = new AssetComment
+        {
+            AssetId  = Asset.Id,
+            TenantId = tid,
+            AuthorId = userId,
+            Body     = NewCommentBody.Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        DbContext.AssetComments.Add(comment);
+        await DbContext.SaveChangesAsync();
+
+        await ProcessMentionsAsync(NewCommentBody.Trim(), Asset);
+        NewCommentBody = "";
+        await LoadAsset();
+    }
+
+    private async Task ProcessMentionsAsync(string body, Asset asset)
+    {
+        var matches = System.Text.RegularExpressions.Regex.Matches(body, @"@([\w.]+)");
+        if (!matches.Any()) return;
+
+        var usernames = matches.Select(m => m.Groups[1].Value).Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var username in usernames)
+        {
+            var user = await DbContext.Users
+                .FirstOrDefaultAsync(u => u.UserName != null && u.UserName.ToLower().Contains(username.ToLower()));
+            if (user?.Email == null) continue;
+
+            try
+            {
+                await EmailService.SendEmailAsync(
+                    user.Email,
+                    $"You were mentioned in a comment on \"{asset.OriginalFileName}\"",
+                    $"<p>Hi {user.UserName},</p>" +
+                    $"<p>You were mentioned in a comment on asset <strong>{System.Net.WebUtility.HtmlEncode(asset.OriginalFileName)}</strong>:</p>" +
+                    $"<blockquote style='border-left:3px solid #ccc;padding-left:1em;color:#555;'>" +
+                    $"{System.Net.WebUtility.HtmlEncode(body)}</blockquote>" +
+                    $"<p><a href='/Assets/{asset.Id}'>View asset ?</a></p>");
+            }
+            catch { /* email not configured — silently ignore */ }
+        }
+    }
+
+    private static string RenderMentions(string body)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(
+            System.Net.WebUtility.HtmlEncode(body),
+            @"@([\w.]+)",
+            "<strong class='text-primary'>@$1</strong>");
+    }
 
     private async Task CopyShareUrl() => await JS.InvokeVoidAsync("navigator.clipboard.writeText", NewShareUrl);
     private async Task CopyDirectUrl(string tok) => await JS.InvokeVoidAsync("navigator.clipboard.writeText", $"{NavManager.BaseUri.TrimEnd('/')}/share/{tok}");

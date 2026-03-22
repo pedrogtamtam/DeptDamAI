@@ -6,7 +6,10 @@
     <div class="top-row ps-3 navbar navbar-light">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center" href="">
-                <img src="dept-logo.svg" alt="DEPT®" class="dept-logo" />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 36" width="120" height="36" aria-label="DEPT®" role="img">
+                    <text x="4" y="27" font-family="'Arial Black','Helvetica Neue',Helvetica,Arial,sans-serif" font-weight="900" font-size="28" letter-spacing="-1" fill="#ffffff">DEPT</text>
+                    <text x="100" y="16" font-family="Arial,Helvetica,sans-serif" font-weight="400" font-size="10" fill="#ffffff">&#174;</text>
+                </svg>
             </a>
         </div>
     </div>
@@ -16,7 +19,7 @@
             <div class="nav-item px-3 mb-1">
                 <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                     <span class="bi bi-house-door-fill" aria-hidden="true" title="Home"></span>
-                    <span class="nav-label">Home</span>
+                    <span class="nav-label">@(Branding?.NavHomeLabel ?? "Home")</span>
                 </NavLink>
             </div>
 
@@ -24,22 +27,22 @@
                 <Authorized>
                     <div class="nav-item px-3 mb-1">
                         <NavLink class="nav-link" href="Assets">
-                            <span class="bi bi-images" aria-hidden="true" title="Assets"></span>
-                            <span class="nav-label">Assets</span>
+                            <span class="bi bi-images" aria-hidden="true" title="@(Branding?.NavAssetsLabel ?? "Assets")"></span>
+                            <span class="nav-label">@(Branding?.NavAssetsLabel ?? "Assets")</span>
                         </NavLink>
                     </div>
 
                     <div class="nav-item px-3 mb-1">
                         <NavLink class="nav-link" href="Collections">
-                            <span class="bi bi-collection" aria-hidden="true" title="Collections"></span>
-                            <span class="nav-label">Collections</span>
+                            <span class="bi bi-collection" aria-hidden="true" title="@(Branding?.NavCollectionsLabel ?? "Collections")"></span>
+                            <span class="nav-label">@(Branding?.NavCollectionsLabel ?? "Collections")</span>
                         </NavLink>
                     </div>
 
                     <div class="nav-item px-3 mb-4">
                         <NavLink class="nav-link" href="Workflow">
-                            <span class="bi bi-kanban" aria-hidden="true" title="Workflow"></span>
-                            <span class="nav-label">Workflow</span>
+                            <span class="bi bi-kanban" aria-hidden="true" title="@(Branding?.NavWorkflowLabel ?? "Workflow")"></span>
+                            <span class="nav-label">@(Branding?.NavWorkflowLabel ?? "Workflow")</span>
                         </NavLink>
                     </div>
 
@@ -79,6 +82,24 @@
                         <NavLink class="nav-link" href="Admin/AiSettings">
                             <span class="bi bi-robot" aria-hidden="true" title="AI Settings"></span>
                             <span class="nav-label">AI Settings</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/AuditLog">
+                            <span class="bi bi-journal-text" aria-hidden="true" title="Audit Log"></span>
+                            <span class="nav-label">Audit Log</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/BrandingEditor">
+                            <span class="bi bi-palette-fill" aria-hidden="true" title="Branding"></span>
+                            <span class="nav-label">Branding</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 mb-1">
+                        <NavLink class="nav-link" href="Admin/DownloadPresets">
+                            <span class="bi bi-download" aria-hidden="true" title="Download Presets"></span>
+                            <span class="nav-label">Download Presets</span>
                         </NavLink>
                     </div>
                     <div class="nav-item px-3 mb-1">
@@ -127,8 +148,9 @@
 </div>
 
 @code {
-    [Parameter] public bool IsCollapsed { get; set; }
-    private string? currentUrl;
+[Parameter] public bool IsCollapsed { get; set; }
+[CascadingParameter] private DeptDam.Models.BrandingSettings? Branding { get; set; }
+private string? currentUrl;
 
     protected override void OnInitialized()
     {

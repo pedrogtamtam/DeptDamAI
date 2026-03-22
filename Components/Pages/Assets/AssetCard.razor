@@ -4,7 +4,16 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using DeptDam.Models
 
-<div class="card h-100 position-relative shadow-sm border-0 asset-card">
+<div class="card h-100 position-relative shadow-sm border-0 asset-card @(IsSelected ? "border border-primary border-2" : "")">
+@if (ShowCheckbox)
+{
+    <div class="position-absolute m-2" style="z-index:20; top:0; left:0;">
+        <input type="checkbox" class="form-check-input shadow-sm" style="width:1.2rem;height:1.2rem;cursor:pointer;"
+               checked="@IsSelected"
+               @onchange="e => OnSelectionChanged.InvokeAsync((bool)(e.Value ?? false))"
+               @onclick:stopPropagation />
+    </div>
+}
     @if (IsDeletable && OnRemove.HasDelegate)
     {
         <button class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 shadow-sm" style="z-index: 10;" title="Remove from Collection" @onclick="OnRemove">
@@ -98,6 +107,9 @@
     [Parameter] public bool IsDeletable { get; set; } = false;
     [Parameter] public EventCallback OnRemove { get; set; }
     [Parameter] public string? SearchTerms { get; set; }
+    [Parameter] public bool ShowCheckbox { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public EventCallback<bool> OnSelectionChanged { get; set; }
 
     private string StateBadgeClass => Asset.WorkflowState switch
     {

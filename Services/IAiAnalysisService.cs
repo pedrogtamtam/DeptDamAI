@@ -10,4 +10,6 @@ public class AiAnalysisResult
     public List<string> Tags { get; set; } = new();
     public string? ExtractedText { get; set; }
     public List<string> FacesDetected { get; set; } = new();
+
+    public static readonly AiAnalysisResult Empty = new();
 }

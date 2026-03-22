@@ -49,5 +49,16 @@ public class StorageProviderFactory : IStorageProvider
         => ResolveProvider().GetFileStreamAsync(storageKey, cancellationToken);
 
     public string GetFileUrl(string storageKey)
-        => ResolveProvider().GetFileUrl(storageKey);
+    {
+        var tenantId = _tenantService.GetCurrentTenantId();
+        if (!string.IsNullOrEmpty(tenantId))
+        {
+            var settings = _dbContext.StorageSettings
+                .IgnoreQueryFilters()
+                .FirstOrDefault(s => s.TenantId == tenantId);
+            if (settings != null && !string.IsNullOrWhiteSpace(settings.CdnBaseUrl))
+                return $"{settings.CdnBaseUrl.TrimEnd('/')}/{tenantId}/{storageKey}";
+        }
+        return ResolveProvider().GetFileUrl(storageKey);
+    }
 }

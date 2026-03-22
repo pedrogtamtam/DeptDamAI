@@ -1,0 +1,246 @@
+@page "/Admin/AuditLog"
+@using DeptDam.Data
+@using DeptDam.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@using DeptDam.Services
+@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+
+<PageTitle>Audit Log</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-journal-text me-2 text-primary"></i>Audit Log</h1>
+        <p class="text-secondary small mb-0">All actions performed in this workspace, ordered most recent first.</p>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="Load">
+        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+    </button>
+</div>
+
+@* ?? Filters ???????????????????????????????????????????????????????????????????? *@
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-4 col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Action</label>
+                <select class="form-select form-select-sm" @bind="filterAction">
+                    <option value="">All actions</option>
+                    <option value="AssetUploaded">Asset Uploaded</option>
+                    <option value="AssetDeleted">Asset Deleted</option>
+                    <option value="WorkflowStateChanged">Workflow State Changed</option>
+                </select>
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Entity type</label>
+                <select class="form-select form-select-sm" @bind="filterEntityType">
+                    <option value="">All types</option>
+                    <option value="Asset">Asset</option>
+                    <option value="Collection">Collection</option>
+                </select>
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Author</label>
+                <input type="text" class="form-control form-control-sm" @bind="filterAuthor"
+                       placeholder="Name or e-mail…" />
+            </div>
+            <div class="col-sm-6 col-md-2">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
+                <input type="date" class="form-control form-control-sm" @bind="filterFrom" />
+            </div>
+            <div class="col-sm-6 col-md-2">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
+                <input type="date" class="form-control form-control-sm" @bind="filterTo" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary btn-sm px-3" @onclick="ApplyFilters">
+                    <i class="bi bi-funnel me-1"></i> Filter
+                </button>
+                <button class="btn btn-outline-secondary btn-sm ms-1" @onclick="ClearFilters">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ?? Table ?????????????????????????????????????????????????????????????????????? *@
+@if (loading)
+{
+    <div class="d-flex justify-content-center p-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else if (!logs.Any())
+{
+    <div class="text-center py-5 bg-light rounded-4 border border-dashed">
+        <i class="bi bi-journal-x display-3 text-muted opacity-25"></i>
+        <p class="mt-3 text-secondary">No audit entries found for the selected filters.</p>
+    </div>
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Timestamp</th>
+                        <th>Author</th>
+                        <th>Action</th>
+                        <th>Entity type</th>
+                        <th>Entity</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in logs)
+                    {
+                        <tr>
+                            <td class="ps-4 text-nowrap text-muted">
+                                @log.Timestamp.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                            </td>
+                            <td>
+                                <span class="fw-semibold">@log.AuthorName</span>
+                            </td>
+                            <td>
+                                <span class="badge @ActionBadgeClass(log.Action) rounded-pill fw-normal">
+                                    @ActionLabel(log.Action)
+                                </span>
+                            </td>
+                            <td class="text-muted">@(log.EntityType ?? "–")</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(log.EntityId) && log.EntityType == "Asset")
+                                {
+                                    <a href="/Assets/@log.EntityId" class="text-decoration-none text-truncate d-inline-block" style="max-width:200px"
+                                       title="@log.EntityName">@log.EntityName</a>
+                                }
+                                else
+                                {
+                                    <span class="text-truncate d-inline-block" style="max-width:200px" title="@log.EntityName">@(log.EntityName ?? "–")</span>
+                                }
+                            </td>
+                            <td class="text-muted">@(log.Details ?? "–")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @* Pagination *@
+    @if (totalCount > PageSize)
+    {
+        <div class="d-flex justify-content-between align-items-center mt-3 px-1 small text-muted">
+            <span>Showing @(((currentPage - 1) * PageSize) + 1)–@(Math.Min(currentPage * PageSize, totalCount)) of @totalCount entries</span>
+            <div class="d-flex gap-1">
+                <button class="btn btn-outline-secondary btn-sm" disabled="@(currentPage <= 1)"
+                        @onclick="() => GoToPage(currentPage - 1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                @for (var p = 1; p <= TotalPages; p++)
+                {
+                    var pageNum = p;
+                    <button class="btn btn-sm @(pageNum == currentPage ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => GoToPage(pageNum)">@pageNum</button>
+                }
+                <button class="btn btn-outline-secondary btn-sm" disabled="@(currentPage >= TotalPages)"
+                        @onclick="() => GoToPage(currentPage + 1)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<DeptDam.Models.AuditLog> logs = new();
+    private bool loading = true;
+    private int totalCount;
+    private int currentPage = 1;
+    private const int PageSize = 50;
+    private int TotalPages => (int)Math.Ceiling(totalCount / (double)PageSize);
+
+    // Filter state
+    private string filterAction = "";
+    private string filterEntityType = "";
+    private string filterAuthor = "";
+    private DateTime? filterFrom;
+    private DateTime? filterTo;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        loading = true;
+        var tid = TenantService.GetCurrentTenantId();
+        if (string.IsNullOrEmpty(tid)) { loading = false; return; }
+
+        var query = DbContext.AuditLogs
+            .IgnoreQueryFilters()
+            .Where(l => l.TenantId == tid);
+
+        if (!string.IsNullOrWhiteSpace(filterAction))
+            query = query.Where(l => l.Action == filterAction);
+
+        if (!string.IsNullOrWhiteSpace(filterEntityType))
+            query = query.Where(l => l.EntityType == filterEntityType);
+
+        if (!string.IsNullOrWhiteSpace(filterAuthor))
+            query = query.Where(l => l.AuthorName.Contains(filterAuthor));
+
+        if (filterFrom.HasValue)
+            query = query.Where(l => l.Timestamp >= filterFrom.Value.ToUniversalTime());
+
+        if (filterTo.HasValue)
+            query = query.Where(l => l.Timestamp < filterTo.Value.AddDays(1).ToUniversalTime());
+
+        totalCount = await query.CountAsync();
+        logs = await query
+            .OrderByDescending(l => l.Timestamp)
+            .Skip((currentPage - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync<DeptDam.Models.AuditLog>();
+
+        loading = false;
+    }
+
+    private async Task ApplyFilters()
+    {
+        currentPage = 1;
+        await Load();
+    }
+
+    private async Task ClearFilters()
+    {
+        filterAction = filterEntityType = filterAuthor = "";
+        filterFrom = filterTo = null;
+        currentPage = 1;
+        await Load();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        currentPage = page;
+        await Load();
+    }
+
+    private static string ActionLabel(string action) => action switch
+    {
+        "AssetUploaded"        => "Asset Uploaded",
+        "AssetDeleted"         => "Asset Deleted",
+        "WorkflowStateChanged" => "Workflow Changed",
+        _                      => action
+    };
+
+    private static string ActionBadgeClass(string action) => action switch
+    {
+        "AssetUploaded"        => "bg-success-subtle text-success",
+        "AssetDeleted"         => "bg-danger-subtle text-danger",
+        "WorkflowStateChanged" => "bg-primary-subtle text-primary",
+        _                      => "bg-secondary-subtle text-secondary"
+    };
+}

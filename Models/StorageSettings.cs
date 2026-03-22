@@ -22,5 +22,13 @@ public class StorageSettings : ITenantEntity
     /// <summary>Azure Blob Storage container name</summary>
     public string? AzureBlobContainerName { get; set; }
 
+    /// <summary>
+    /// Optional CDN base URL (e.g. https://cdn.example.com).
+    /// When set, asset URLs are served as {CdnBaseUrl}/{tenantId}/{storageKey}
+    /// instead of being routed through the local media controller.
+    /// </summary>
+    [MaxLength(500)]
+    public string? CdnBaseUrl { get; set; }
+
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

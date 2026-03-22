@@ -19,22 +19,25 @@ public class AssetService : IAssetService
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ITenantService _tenantService;
     private readonly IAiAnalysisService _aiService;
+    private readonly IAuditService _auditService;
 
     public AssetService(
         ApplicationDbContext context, 
         IStorageProvider storageProvider, 
         IHttpContextAccessor httpContextAccessor, 
         ITenantService tenantService,
-        IAiAnalysisService aiService)
+        IAiAnalysisService aiService,
+        IAuditService auditService)
     {
         _context = context;
         _storageProvider = storageProvider;
         _httpContextAccessor = httpContextAccessor;
         _tenantService = tenantService;
         _aiService = aiService;
+        _auditService = auditService;
     }
 
-    public async Task<Asset> CreateAssetAsync(Stream fileStream, string fileName, string contentType)
+    public async Task<Asset> CreateAssetAsync(Stream fileStream, string fileName, string contentType, bool useAi = false)
     {
         var tenantId = _tenantService.GetCurrentTenantId();
         if (string.IsNullOrEmpty(tenantId))
@@ -94,8 +97,10 @@ public class AssetService : IAssetService
             ms.Position = 0;
         }
 
-        // Run AI Analysis
-        var aiResult = await _aiService.AnalyzeAssetAsync(ms, fileName);
+        // Run AI Analysis (only when requested)
+        AiAnalysisResult aiResult = useAi
+            ? await _aiService.AnalyzeAssetAsync(ms, fileName)
+            : AiAnalysisResult.Empty;
         ms.Position = 0;
 
         // Upload to storage
@@ -160,6 +165,14 @@ public class AssetService : IAssetService
         });
 
         await _context.SaveChangesAsync();
+
+        await _auditService.LogAsync(
+            authorId:   userId,
+            authorName: _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? userId,
+            action:     "AssetUploaded",
+            entityType: "Asset",
+            entityId:   asset.Id,
+            entityName: asset.OriginalFileName);
 
         return asset;
     }
@@ -314,6 +327,16 @@ public class AssetService : IAssetService
                 }
             }
             await _context.SaveChangesAsync();
+
+            var delUser = _httpContextAccessor.HttpContext?.User;
+            var delUserId = delUser?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            await _auditService.LogAsync(
+                authorId:   delUserId,
+                authorName: delUser?.Identity?.Name ?? delUserId,
+                action:     "AssetDeleted",
+                entityType: "Asset",
+                entityId:   assetId,
+                entityName: asset.OriginalFileName);
         }
     }
     
@@ -370,6 +393,62 @@ public class AssetService : IAssetService
             _context.AssetTags.Add(new AssetTag { TenantId = tenantId, AssetId = assetId, TagId = tag.Id });
         }
 
+        await _context.SaveChangesAsync();
+    }
+
+    // ?? Bulk operations ??????????????????????????????????????????????????????
+
+    public async Task BulkAddTagAsync(IEnumerable<string> assetIds, string tagName)
+    {
+        var tenantId = _tenantService.GetCurrentTenantId()!;
+        var ids = assetIds.ToList();
+
+        var tag = await _context.Tags.FirstOrDefaultAsync(t => t.TenantId == tenantId && t.Name == tagName);
+        if (tag == null)
+        {
+            tag = new Models.Tag { TenantId = tenantId, Name = tagName };
+            _context.Tags.Add(tag);
+            await _context.SaveChangesAsync();
+        }
+
+        foreach (var assetId in ids)
+        {
+            var alreadyTagged = await _context.AssetTags
+                .AnyAsync(at => at.AssetId == assetId && at.TagId == tag.Id);
+            if (!alreadyTagged)
+                _context.AssetTags.Add(new AssetTag { TenantId = tenantId, AssetId = assetId, TagId = tag.Id });
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task BulkMoveToCollectionAsync(IEnumerable<string> assetIds, string collectionId)
+    {
+        var tenantId = _tenantService.GetCurrentTenantId()!;
+        var ids = assetIds.ToList();
+
+        foreach (var assetId in ids)
+        {
+            var exists = await _context.CollectionAssets
+                .AnyAsync(ca => ca.CollectionId == collectionId && ca.AssetId == assetId);
+            if (!exists)
+                _context.CollectionAssets.Add(new CollectionAsset
+                {
+                    TenantId = tenantId,
+                    CollectionId = collectionId,
+                    AssetId = assetId
+                });
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task BulkSetWorkflowStateAsync(IEnumerable<string> assetIds, AssetWorkflowState newState)
+    {
+        var ids = assetIds.ToList();
+        var assets = await _context.Assets.Where(a => ids.Contains(a.Id)).ToListAsync();
+        foreach (var asset in assets)
+            asset.WorkflowState = newState;
         await _context.SaveChangesAsync();
     }
 }

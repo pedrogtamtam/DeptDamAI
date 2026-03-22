@@ -6,21 +6,23 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject ApplicationDbContext DbContext
+@inject DeptDam.Services.IBrandingService BrandingService
+@implements IDisposable
 
 <PageTitle>DEPT DAM - Dashboard</PageTitle>
 
 <div class="container-fluid p-0 animate-fade-in">
     <div class="row mb-5 align-items-center bg-white rounded-4 p-5 shadow-sm border border-light g-4">
         <div class="col-md-7">
-            <div class="badge bg-primary-subtle text-primary mb-3 px-3 py-2 rounded-pill fw-normal letter-spacing-1">WELCOME BACK</div>
-            <h1 class="display-5 fw-bold mb-3">Your Creative Workspace</h1>
-            <p class="lead text-secondary mb-4">Manage, organize, and distribute your digital assets with enterprise-grade security and speed.</p>
+            <div class="badge bg-primary-subtle text-primary mb-3 px-3 py-2 rounded-pill fw-normal letter-spacing-1">@branding.HeroBadgeText</div>
+            <h1 class="display-5 fw-bold mb-3">@branding.HeroTitle</h1>
+            <p class="lead text-secondary mb-4">@branding.HeroSubtitle</p>
             <div class="d-flex flex-wrap gap-2">
                 <a href="/Assets/Upload" class="btn btn-primary btn-lg px-4 py-2 shadow-sm rounded-pill">
-                    <i class="bi bi-cloud-upload me-2"></i> Upload New Asset
+                    <i class="bi bi-cloud-upload me-2"></i> @branding.PrimaryButtonLabel
                 </a>
                 <a href="/Collections/Create" class="btn btn-white btn-lg px-4 py-2 border shadow-sm rounded-pill">
-                    <i class="bi bi-collection me-2"></i> Create Collection
+                    <i class="bi bi-collection me-2"></i> @branding.SecondaryButtonLabel
                 </a>
             </div>
         </div>
@@ -155,6 +157,7 @@
 </style>
 
 @code {
+    private DeptDam.Models.BrandingSettings branding = new();
     private bool Loading = true;
     private int TotalAssets = 0;
     private int TotalCollections = 0;
@@ -163,6 +166,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        branding = await BrandingService.GetAsync();
+        BrandingService.OnChanged += HandleBrandingChanged;
+
         TotalAssets = await DbContext.Assets.CountAsync();
         TotalCollections = await DbContext.Collections.CountAsync();
         TotalStorageBytes = await DbContext.Assets.SumAsync(a => (long)a.SizeBytes);
@@ -173,6 +179,17 @@
             .ToListAsync();
 
         Loading = false;
+    }
+
+    private void HandleBrandingChanged(DeptDam.Models.BrandingSettings updated)
+    {
+        branding = updated;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        BrandingService.OnChanged -= HandleBrandingChanged;
     }
 }
 

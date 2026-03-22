@@ -1,4 +1,5 @@
 using DeptDam.Services.Storage;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SixLabors.ImageSharp;
@@ -6,6 +7,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Processing;
+using System.IO.Compression;
 
 namespace DeptDam.Controllers;
 
@@ -136,5 +138,61 @@ public class MediaController : ControllerBase
             _logger.LogError(ex, "Error serving media: {StorageKey}", storageKey);
             return StatusCode(500, "Error serving media");
         }
+    }
+
+    /// <summary>
+    /// Streams a ZIP archive of the requested assets.
+    /// GET /api/media/bulk-download?ids=id1,id2,...
+    /// </summary>
+    [HttpGet("bulk-download")]
+    [Authorize]
+    public async Task<IActionResult> BulkDownload([FromQuery] string ids)
+    {
+        if (string.IsNullOrWhiteSpace(ids))
+            return BadRequest("No asset IDs provided.");
+
+        var assetIds = ids.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        var assets = await _context.Assets
+            .Where(a => assetIds.Contains(a.Id))
+            .ToListAsync();
+
+        if (!assets.Any())
+            return NotFound("No matching assets found.");
+
+        var ms = new MemoryStream();
+        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var usedNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var asset in assets)
+            {
+                // Deduplicate filenames inside the ZIP
+                var name = asset.OriginalFileName;
+                if (usedNames.TryGetValue(name, out var count))
+                {
+                    usedNames[name] = ++count;
+                    var ext = Path.GetExtension(name);
+                    name = $"{Path.GetFileNameWithoutExtension(name)} ({count}){ext}";
+                }
+                else
+                {
+                    usedNames[name] = 1;
+                }
+
+                try
+                {
+                    var entry = archive.CreateEntry(name, CompressionLevel.Fastest);
+                    await using var entryStream = entry.Open();
+                    await using var fileStream = await _storageProvider.GetFileStreamAsync(asset.StorageKey);
+                    await fileStream.CopyToAsync(entryStream);
+                }
+                catch (FileNotFoundException)
+                {
+                    // Skip missing files rather than aborting the whole ZIP
+                }
+            }
+        }
+
+        ms.Position = 0;
+        return File(ms, "application/zip", $"assets-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
     }
 }

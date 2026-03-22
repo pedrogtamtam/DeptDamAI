@@ -41,7 +41,7 @@ public static class DbSeeder
         
         foreach (var tenant in tenants)
         {
-            string[] roles = { "SuperAdmin", "DAM_Admin", "DAM_Contributor", "DAM_Viewer" };
+            string[] roles = { "SuperAdmin", "DAM_Admin", "DAM_Contributor", "DAM_Reviewer", "DAM_Viewer" };
             foreach (var roleName in roles)
             {
                 var roleExists = await context.Roles.IgnoreQueryFilters().AnyAsync(r => r.Name == roleName && ((ApplicationRole)r).TenantId == tenant.Id);

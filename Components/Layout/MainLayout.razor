@@ -1,5 +1,8 @@
 @inherits LayoutComponentBase
+@inject DeptDam.Services.IBrandingService BrandingService
+@implements IDisposable
 
+<CascadingValue Value="branding">
 <div class="page @(IsCollapsed ? "collapsed" : "")">
     <div class="sidebar">
         <NavMenu IsCollapsed="IsCollapsed" />
@@ -53,9 +56,28 @@
         </article>
     </main>
 </div>
+</CascadingValue>
 
 @code {
     private bool IsCollapsed { get; set; }
+    private DeptDam.Models.BrandingSettings branding = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        branding = await BrandingService.GetAsync();
+        BrandingService.OnChanged += HandleBrandingChanged;
+    }
+
+    private void HandleBrandingChanged(DeptDam.Models.BrandingSettings updated)
+    {
+        branding = updated;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        BrandingService.OnChanged -= HandleBrandingChanged;
+    }
 }
 
 <script>

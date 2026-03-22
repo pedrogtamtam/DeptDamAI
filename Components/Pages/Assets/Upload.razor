@@ -56,6 +56,13 @@
                         <div class="alert alert-danger">@errorMessage</div>
                     }
 
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="useAiToggle" @bind="useAi" />
+                        <label class="form-check-label" for="useAiToggle">
+                            <i class="bi bi-robot me-1"></i> Run AI analysis after upload
+                        </label>
+                        <div class="form-text">When enabled, AI will auto-tag the asset, extract text and detect faces. Adds a few seconds per file.</div>
+                    </div>
                     <button class="btn btn-primary" @onclick="HandleSubmit" disabled="@(!selectedFiles.Any() || isUploading)">
                         @if (isUploading)
                         {
@@ -73,6 +80,7 @@
 @code {
     private List<IBrowserFile> selectedFiles = new();
     private bool isUploading = false;
+    private bool useAi = false;
     private string? errorMessage;
     private int processedCount = 0;
     private int totalCount = 0;
@@ -117,7 +125,7 @@
                 try 
                 {
                     await using var stream = file.OpenReadStream(maxAllowedSize);
-                    await AssetService.CreateAssetAsync(stream, file.Name, file.ContentType);
+                    await AssetService.CreateAssetAsync(stream, file.Name, file.ContentType, useAi);
                 }
                 catch (InvalidOperationException dupEx)
                 {
