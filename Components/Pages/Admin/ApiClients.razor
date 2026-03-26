@@ -10,6 +10,8 @@
 @inject ApiKeyService ApiKeyService
 @inject ITenantService TenantService
 @inject IPermissionService PermissionService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 
 <PageTitle>API Clients</PageTitle>
 
@@ -33,8 +35,20 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Development Tools</div>
+                <div class="card-body d-flex flex-column justify-content-center align-items-center" style="min-height: 120px;">
+                    <p class="text-muted small text-center mb-3">Download a Postman collection to start integrating with our API.</p>
+                    <button class="btn btn-outline-primary" @onclick="DownloadPostmanCollection">
+                        <i class="bi bi-download me-2"></i> Download Postman Collection
+                    </button>
+                </div>
+            </div>
+        </div>
     </PermissionView>
 </div>
+
 
 @if (NewlyGeneratedSecret != null)
 {
@@ -122,7 +136,121 @@
         await LoadClients();
     }
 
+    private async Task DownloadPostmanCollection()
+    {
+        var baseUrl = NavigationManager.BaseUri.TrimEnd('/');
+        var postmanCollection = new
+        {
+            info = new
+            {
+                name = "DeptDam API",
+                _postman_id = Guid.NewGuid().ToString(),
+                schema = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+            },
+            item = new object[]
+            {
+                new {
+                    name = "Authentication",
+                    item = new object[] {
+                        new {
+                            name = "Get Access Token",
+                            request = new {
+                                method = "POST",
+                                body = new {
+                                    mode = "urlencoded",
+                                    urlencoded = new[] {
+                                        new { key = "grant_type", value = "client_credentials", type = "text" },
+                                        new { key = "client_id", value = "{{client_id}}", type = "text" },
+                                        new { key = "client_secret", value = "{{client_secret}}", type = "text" }
+                                    }
+                                },
+                                url = new {
+                                    raw = "{{base_url}}/connect/token",
+                                    host = new[] { "{{base_url}}" },
+                                    path = new[] { "connect", "token" }
+                                },
+                                description = "Request a JWT access token using client credentials."
+                            }
+                        }
+                    }
+                },
+                new {
+                    name = "Assets",
+                    item = new object[] {
+                        new {
+                            name = "List Assets",
+                            request = new {
+                                auth = new {
+                                    type = "bearer",
+                                    bearer = new[] { new { key = "token", value = "{{access_token}}", type = "string" } }
+                                },
+                                method = "GET",
+                                url = new {
+                                    raw = "{{base_url}}/api/assets?page=1&pageSize=50",
+                                    host = new[] { "{{base_url}}" },
+                                    path = new[] { "api", "assets" },
+                                    query = new[] {
+                                        new { key = "page", value = "1" },
+                                        new { key = "pageSize", value = "50" }
+                                    }
+                                }
+                            }
+                        },
+                        new {
+                            name = "Get Asset Details",
+                            request = new {
+                                auth = new {
+                                    type = "bearer",
+                                    bearer = new[] { new { key = "token", value = "{{access_token}}", type = "string" } }
+                                },
+                                method = "GET",
+                                url = new {
+                                    raw = "{{base_url}}/api/assets/{{asset_id}}",
+                                    host = new[] { "{{base_url}}" },
+                                    path = new[] { "api", "assets", "{{asset_id}}" }
+                                }
+                            }
+                        },
+                        new {
+                             name = "Upload Asset",
+                             request = new {
+                                 auth = new {
+                                     type = "bearer",
+                                     bearer = new[] { new { key = "token", value = "{{access_token}}", type = "string" } }
+                                 },
+                                 method = "POST",
+                                 body = new {
+                                     mode = "formdata",
+                                     formdata = new[] {
+                                         new { key = "file", type = "file", src = "", description = "The file to upload" }
+                                     }
+                                 },
+                                 url = new {
+                                     raw = "{{base_url}}/api/assets/upload",
+                                     host = new[] { "{{base_url}}" },
+                                     path = new[] { "api", "assets", "upload" }
+                                 }
+                             }
+                        }
+                    }
+                }
+            },
+            variable = new[] {
+                new { key = "base_url", value = baseUrl, type = "string" },
+                new { key = "client_id", value = NewlyGeneratedClientId ?? "", type = "string" },
+                new { key = "client_secret", value = NewlyGeneratedSecret ?? "", type = "string" },
+                new { key = "access_token", value = "", type = "string" },
+                new { key = "asset_id", value = "", type = "string" }
+            }
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(postmanCollection, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Components/Pages/Admin/ApiClients.razor.js");
+        await module.InvokeVoidAsync("downloadFile", "DeptDam-API.postman_collection.json", json);
+    }
+
     public class CreateClientViewModel
+
     {
         [System.ComponentModel.DataAnnotations.Required]
         [System.ComponentModel.DataAnnotations.StringLength(50)]

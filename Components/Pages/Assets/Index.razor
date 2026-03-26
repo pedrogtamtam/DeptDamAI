@@ -229,9 +229,6 @@
             </div>
 
             <div class="d-flex gap-2 mt-3 pt-3 border-top">
-                <button class="btn btn-sm btn-primary" @onclick="SearchAssets">
-                    <i class="bi bi-search me-1"></i>Apply Filters
-                </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="ResetFilters">
                     <i class="bi bi-x-circle me-1"></i>Reset
                 </button>
@@ -482,10 +479,20 @@ else
         // File type facet
         if (SelectedFileTypes.Any())
         {
-            query = query.Where(a => SelectedFileTypes
-                .Any(ft => FileTypeOptions.ContainsKey(ft) &&
-                     FileTypeOptions[ft].Prefixes.Any(p => a.ContentType.StartsWith(p))));
+            var prefixes = SelectedFileTypes
+                .SelectMany(ft => FileTypeOptions.TryGetValue(ft, out var val) ? val.Prefixes : Array.Empty<string>())
+                .ToList();
+
+            if (prefixes.Any())
+            {
+                // Most modern EF Core versions can translate localList.Any(p => dbProp.StartsWith(p)) 
+                // into a series of LIKE clauses in SQL.
+                query = query.Where(a => prefixes.Any(p => a.ContentType.StartsWith(p)));
+            }
         }
+
+
+
 
         // Tag facet
         if (SelectedTagIds.Any())
@@ -536,12 +543,9 @@ else
         };
 
         var fetched = await query.Take(PageSize * CurrentPage).ToListAsync();
-
-        if (append && assets != null)
-            assets = fetched;
-        else
-            assets = fetched;
+        assets = fetched; // Always replace since we use Take(PageSize * CurrentPage) which includes previous items
     }
+
 
     private async Task LoadMore()
     {
