@@ -40,11 +40,22 @@ public class PermissionService : IPermissionService
             return new List<string>();
         }
 
+        // Check if this is an API Client token (Machine-to-Machine)
+        if (user.HasClaim(c => c.Type == "client_name") && user.HasClaim(c => c.Type == "tenant_id"))
+        {
+            // API Clients get all asset, collection and config permissions for their tenant by default
+            return AppPermissions.AllPermissions.Where(p => 
+                p != AppPermissions.UsersManage && 
+                p != AppPermissions.RolesManage).ToList();
+        }
+
         var userId = _userManager.GetUserId(user);
         if (userId == null)
         {
             return new List<string>();
         }
+
+
 
         // Use a separate context to avoid concurrency issues with the scoped context used by UserManager
         // This is necessary in Blazor when multiple components might check permissions concurrently

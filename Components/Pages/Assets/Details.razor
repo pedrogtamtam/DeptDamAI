@@ -33,7 +33,7 @@ else
         <!-- Main Content Area -->
         <div class="col-lg-8">
             <!-- Asset Preview Card -->
-            <div class="card border-0 bg-dark-subtle shadow-sm overflow-hidden mb-4">
+            <div class="card border-0 bg-dark-subtle shadow-sm mb-4">
                 <div class="card-body p-0 text-center d-flex align-items-center justify-content-center" style="min-height: 500px; position: relative; background-image: radial-gradient(#d1d5db 1px, transparent 1px); background-size: 20px 20px;">
                     @if (Asset.ContentType != null && Asset.ContentType.StartsWith("image/"))
                     {
@@ -69,26 +69,26 @@ else
                             <a href="/api/media/@Asset.TenantId/@Asset.StorageKey" target="_blank" class="btn btn-sm btn-primary px-3 shadow-sm" download="@Asset.OriginalFileName">
                                 <i class="bi bi-download me-1"></i> Download
                             </a>
-                            @if (downloadPresets.Any())
+                            @if (transformations.Any())
                             {
                                 <div class="dropdown">
                                     <button class="btn btn-sm btn-outline-primary dropdown-toggle px-2 shadow-sm" @onclick="() => showDownloadDropdown = !showDownloadDropdown">
                                         <i class="bi bi-chevron-down"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 small @(showDownloadDropdown ? "show" : "")" style="position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate(0px, 32px);">
-                                        <li><h6 class="dropdown-header">Download as…</h6></li>
-                                        @foreach (var preset in downloadPresets)
+                                        <li><h6 class="dropdown-header">Transformations</h6></li>
+                                        @foreach (var transformation in transformations)
                                         {
-                                            var q = preset.Format == "original" ? "" : $"&format={preset.Format}&q={preset.Quality}";
-                                            var w = preset.Width.HasValue ? $"&w={preset.Width}" : "";
-                                            var h = preset.Height.HasValue ? $"&h={preset.Height}" : "";
+                                            var q = transformation.Format == "original" ? "" : $"&format={transformation.Format}&q={transformation.Quality}";
+                                            var w = transformation.Width.HasValue ? $"&w={transformation.Width}" : "";
+                                            var h = transformation.Height.HasValue ? $"&h={transformation.Height}" : "";
                                             <li>
                                                 <a class="dropdown-item" href="/api/media/@Asset.TenantId/@Asset.StorageKey?@($"{w}{h}{q}".TrimStart('&'))" target="_blank" download
                                                    @onclick="() => showDownloadDropdown = false">
-                                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>@preset.Name
-                                                    @if (preset.Width.HasValue || preset.Height.HasValue)
+                                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>@transformation.Name
+                                                    @if (transformation.Width.HasValue || transformation.Height.HasValue)
                                                     {
-                                                        <small class="text-muted ms-1">(@(preset.Width?.ToString() ?? "auto")×@(preset.Height?.ToString() ?? "auto"))</small>
+                                                        <small class="text-muted ms-1">(@(transformation.Width?.ToString() ?? "auto") x @(transformation.Height?.ToString() ?? "auto"))</small>
                                                     }
                                                 </a>
                                             </li>
@@ -253,6 +253,19 @@ else
                     <div class="mb-4">
                         <label class="form-label text-muted x-small fw-bold text-uppercase ls-1">Business Expiration</label>
                         <input type="date" class="form-control form-control-sm border-0 bg-light p-2" @bind="EditModel.ExpiresAt" />
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="form-check form-switch bg-light p-2 ps-5 rounded-3 border-0 transition-all">
+                            <input class="form-check-input" type="checkbox" id="publicAccessSwitch" @bind="EditModel.IsPublic">
+                            <label class="form-check-label text-muted x-small fw-bold text-uppercase ls-1 ms-2" for="publicAccessSwitch">
+                                <i class="bi @(EditModel.IsPublic ? "bi-globe text-primary" : "bi-lock-fill") me-1"></i> Public Access
+                            </label>
+                            @if (EditModel.IsPublic)
+                            {
+                                <div class="mt-1 x-small text-primary opacity-75"><i class="bi bi-info-circle me-1"></i>Accessible via direct URL without token.</div>
+                            }
+                        </div>
                     </div>
 
                     @foreach (var f in AllCustomFields)
@@ -421,7 +434,7 @@ else
     private bool isReAnalyzing;
     private bool ShowStatusDropdown;
     private bool showDownloadDropdown;
-    private List<DeptDam.Models.DownloadPreset> downloadPresets = new();
+    private List<Transformation> transformations = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -446,6 +459,7 @@ else
         {
             EditModel.OriginalFileName = Asset.OriginalFileName;
             EditModel.ExpiresAt = Asset.ExpiresAt;
+            EditModel.IsPublic = Asset.IsPublic;
             AllCustomFields = await DbContext.CustomFields.OrderBy(f => f.Name).ToListAsync();
             CustomValues.Clear();
             foreach (var f in AllCustomFields) {
@@ -454,7 +468,7 @@ else
             }
             Comments = await DbContext.AssetComments.Include(c => c.Author).Where(c => c.AssetId == Asset.Id).ToListAsync();
             var tid = TenantService.GetCurrentTenantId();
-            downloadPresets = string.IsNullOrEmpty(tid) ? new() : await DbContext.DownloadPresets
+            transformations = string.IsNullOrEmpty(tid) ? new() : await DbContext.Transformations
                 .IgnoreQueryFilters()
                 .Where(p => p.TenantId == tid)
                 .OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
@@ -488,6 +502,7 @@ else
         if (Asset == null) return;
         Asset.OriginalFileName = EditModel.OriginalFileName;
         Asset.ExpiresAt = EditModel.ExpiresAt;
+        Asset.IsPublic = EditModel.IsPublic;
         foreach (var kvp in CustomValues) {
             var v = Asset.MetadataValues.FirstOrDefault(m => m.CustomFieldId == kvp.Key);
             if (v == null && !string.IsNullOrEmpty(kvp.Value)) DbContext.AssetMetadataValues.Add(new AssetMetadataValue { AssetId = Asset.Id, CustomFieldId = kvp.Key, Value = kvp.Value, TenantId = TenantService.GetCurrentTenantId()! });
@@ -683,5 +698,5 @@ else
 
     public void Dispose() => _pollingTimer?.Dispose();
 
-    public class AssetEditModel { public string OriginalFileName { get; set; } = ""; public DateTime? ExpiresAt { get; set; } }
+    public class AssetEditModel { public string OriginalFileName { get; set; } = ""; public DateTime? ExpiresAt { get; set; } public bool IsPublic { get; set; } }
 }

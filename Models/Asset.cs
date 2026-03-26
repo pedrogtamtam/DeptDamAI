@@ -31,6 +31,8 @@ public class Asset : ITenantEntity
     public int? Height { get; set; }
 
     public AssetWorkflowState WorkflowState { get; set; } = AssetWorkflowState.Draft;
+    
+    public bool IsPublic { get; set; } = false;
 
     public string? ExifData { get; set; }
     public string? ExtractedText { get; set; }

@@ -37,7 +37,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<StorageSettings> StorageSettings { get; set; }
     public DbSet<BrandingSettings> BrandingSettings { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
-    public DbSet<DownloadPreset> DownloadPresets { get; set; }
+    public DbSet<Transformation> Transformations { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

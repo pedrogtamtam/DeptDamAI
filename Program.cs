@@ -61,7 +61,10 @@ builder.Services.AddAuthentication()
         };
     });
 
+builder.Services.AddAuthorization();
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
@@ -99,12 +102,18 @@ else
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseRouting();
+
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.UseAntiforgery();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
+
     .AddInteractiveServerRenderMode();
 
 // Add additional endpoints required by the Identity /Account Razor components.

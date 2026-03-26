@@ -4,6 +4,7 @@ using DeptDam.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DeptDam.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260326152635_RenameRenditions")]
+    partial class RenameRenditions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -219,9 +222,6 @@ namespace DeptDam.Migrations
 
                     b.Property<int?>("Height")
                         .HasColumnType("int");
-
-                    b.Property<bool>("IsPublic")
-                        .HasColumnType("bit");
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
@@ -658,6 +658,44 @@ namespace DeptDam.Migrations
                     b.ToTable("CustomFields");
                 });
 
+            modelBuilder.Entity("DeptDam.Models.Rendition", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Quality")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("Renditions");
+                });
+
             modelBuilder.Entity("DeptDam.Models.ShareLink", b =>
                 {
                     b.Property<string>("Id")
@@ -843,61 +881,6 @@ namespace DeptDam.Migrations
                         .IsUnique();
 
                     b.ToTable("Tenants");
-                });
-
-            modelBuilder.Entity("DeptDam.Models.Transformation", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<int>("Brightness")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Contrast")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Format")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<bool>("Grayscale")
-                        .HasColumnType("bit");
-
-                    b.Property<int?>("Height")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("Quality")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ResizeMode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("Sepia")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TenantId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<int?>("Width")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.ToTable("Transformations");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1304,6 +1287,17 @@ namespace DeptDam.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("DeptDam.Models.Rendition", b =>
+                {
+                    b.HasOne("DeptDam.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("DeptDam.Models.ShareLink", b =>
                 {
                     b.HasOne("DeptDam.Models.Asset", "Asset")
@@ -1359,17 +1353,6 @@ namespace DeptDam.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Tenant");
-                });
-
-            modelBuilder.Entity("DeptDam.Models.Transformation", b =>
-                {
-                    b.HasOne("DeptDam.Models.Tenant", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Tenant");

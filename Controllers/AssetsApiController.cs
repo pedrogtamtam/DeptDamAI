@@ -51,6 +51,23 @@ public class AssetsApiController : ControllerBase
                 a.SizeBytes,
                 a.UploadedAt,
                 a.WorkflowState,
+                a.Width,
+                a.Height,
+                a.ExpiresAt,
+                a.IsPublic,
+                Tags = a.Tags.Select(at => at.Tag!.Name).ToList(),
+                Transformations = _dbContext.Transformations
+                    .IgnoreQueryFilters()
+                    .Where(r => r.TenantId == tenantIdClaim)
+                    .OrderBy(r => r.SortOrder)
+                    .Select(r => new {
+                        r.Name,
+                        Url = $"/api/media/{tenantIdClaim}/{a.StorageKey}?w={r.Width}&h={r.Height}&format={r.Format}&q={r.Quality}" +
+                              $"&mode={r.ResizeMode}{(r.Grayscale ? "&gray=true" : "")}{(r.Sepia ? "&sepia=true" : "")}" +
+                              (r.Brightness != 0 ? $"&bright={r.Brightness}" : "") +
+                              (r.Contrast != 0 ? $"&cont={r.Contrast}" : "")
+                    })
+                    .ToList(),
                 MediaUrl = $"/api/media/{a.TenantId}/{a.StorageKey}"
             })
             .ToListAsync();
@@ -64,22 +81,28 @@ public class AssetsApiController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAsset(string id)
     {
-        if (!await _permissionService.HasPermissionAsync(User, AppPermissions.AssetsView))
-        {
-            return Forbid();
-        }
-
         var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
-        if (string.IsNullOrEmpty(tenantIdClaim))
+
+        var tempAsset = await _dbContext.Assets
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (tempAsset == null) return NotFound();
+
+        // Privacy: If not public, require authentication and permission
+        if (!tempAsset.IsPublic)
         {
-            return Forbid();
+            if (User.Identity?.IsAuthenticated != true) return Unauthorized();
+            if (!await _permissionService.HasPermissionAsync(User, AppPermissions.AssetsView)) return Forbid();
+            if (string.IsNullOrEmpty(tenantIdClaim) || tempAsset.TenantId != tenantIdClaim) return Forbid();
         }
 
         var asset = await _dbContext.Assets
             .IgnoreQueryFilters()
-            .Where(a => a.TenantId == tenantIdClaim && a.Id == id)
+            .Where(a => a.Id == id)
             .Select(a => new
             {
                 a.Id,
@@ -88,14 +111,48 @@ public class AssetsApiController : ControllerBase
                 a.SizeBytes,
                 a.UploadedAt,
                 a.WorkflowState,
+                a.Width,
+                a.Height,
+                a.ExpiresAt,
+                a.IsPublic,
+                a.FileHash,
+                a.UploadedById,
+                a.ExtractedText,
+                a.ExifData,
+                a.FacesDetected,
+                Tags = a.Tags.Select(at => at.Tag!.Name).ToList(),
+                Metadata = a.MetadataValues.Select(mv => new
+                {
+                    Field = mv.CustomField!.Name,
+                    mv.Value
+                }).ToList(),
+                Versions = a.Versions.Select(v => new
+                {
+                    v.VersionNumber,
+                    v.CreatedAt,
+                    User = v.CreatedBy != null ? v.CreatedBy.Email : "System",
+                    v.VersionNote,
+                    v.SizeBytes
+                }).OrderByDescending(v => v.VersionNumber).ToList(),
+                Collections = _dbContext.CollectionAssets
+                    .Where(ca => ca.AssetId == a.Id && ca.TenantId == a.TenantId)
+                    .Select(ca => ca.Collection!.Name)
+                    .ToList(),
+                Transformations = _dbContext.Transformations
+                    .IgnoreQueryFilters()
+                    .Where(r => r.TenantId == a.TenantId)
+                    .OrderBy(r => r.SortOrder)
+                    .Select(r => new {
+                        r.Name,
+                        Url = $"/api/media/{a.TenantId}/{a.StorageKey}?w={r.Width}&h={r.Height}&format={r.Format}&q={r.Quality}" +
+                              $"&mode={r.ResizeMode}{(r.Grayscale ? "&gray=true" : "")}{(r.Sepia ? "&sepia=true" : "")}" +
+                              (r.Brightness != 0 ? $"&bright={r.Brightness}" : "") +
+                              (r.Contrast != 0 ? $"&cont={r.Contrast}" : "")
+                    })
+                    .ToList(),
                 MediaUrl = $"/api/media/{a.TenantId}/{a.StorageKey}"
             })
             .FirstOrDefaultAsync();
-
-        if (asset == null)
-        {
-            return NotFound();
-        }
 
         return Ok(asset);
     }
@@ -122,6 +179,12 @@ public class AssetsApiController : ControllerBase
             return BadRequest("No file uploaded.");
         }
 
+        // Use sub (clientId) or client_name for UploadedById
+        var uploadedById = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                           ?? User.FindFirst("sub")?.Value 
+                           ?? User.FindFirst("client_name")?.Value 
+                           ?? "ApiClient";
+
         // Generate a unique storage key
         var extension = Path.GetExtension(file.FileName);
         var storageKey = $"{Guid.NewGuid()}{extension}";
@@ -138,6 +201,7 @@ public class AssetsApiController : ControllerBase
                 SizeBytes = file.Length,
                 StorageKey = savedKey,
                 TenantId = tenantIdClaim,
+                UploadedById = uploadedById,
                 WorkflowState = AssetWorkflowState.Draft
             };
 
@@ -148,7 +212,12 @@ public class AssetsApiController : ControllerBase
             {
                 asset.Id,
                 asset.OriginalFileName,
+                asset.ContentType,
+                asset.SizeBytes,
+                asset.UploadedAt,
                 asset.WorkflowState,
+                asset.UploadedById,
+                Tags = new List<string>(),
                 MediaUrl = $"/api/media/{asset.TenantId}/{asset.StorageKey}"
             });
         }

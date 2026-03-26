@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace DeptDam.Models;
 
 /// <summary>Per-tenant predefined download format/size combination.</summary>
-public class DownloadPreset : ITenantEntity
+public class Transformation : ITenantEntity
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
@@ -26,6 +26,15 @@ public class DownloadPreset : ITenantEntity
 
     /// <summary>JPEG/WebP compression quality 10–100.</summary>
     public int Quality { get; set; } = 85;
+
+    /// <summary>Resize mode: "max", "crop", "pad", "stretch".</summary>
+    [MaxLength(20)]
+    public string ResizeMode { get; set; } = "max";
+
+    public bool Grayscale { get; set; } = false;
+    public bool Sepia { get; set; } = false;
+    public int Brightness { get; set; } = 0; // -100 to 100 or similar
+    public int Contrast { get; set; } = 0;   // -100 to 100 or similar
 
     public int SortOrder { get; set; }
 }

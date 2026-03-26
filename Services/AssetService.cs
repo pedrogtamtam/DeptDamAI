@@ -43,7 +43,7 @@ public class AssetService : IAssetService
         _tracker = tracker;
     }
 
-    public async Task<Asset> CreateAssetAsync(Stream fileStream, string fileName, string contentType, bool useAi = false)
+    public async Task<Asset> CreateAssetAsync(Stream fileStream, string fileName, string contentType, bool useAi = false, bool isPublic = false)
     {
         var tenantId = _tenantService.GetCurrentTenantId();
         if (string.IsNullOrEmpty(tenantId))
@@ -125,7 +125,8 @@ public class AssetService : IAssetService
             FacesDetected = aiResult.FacesDetected.Any() ? string.Join(", ", aiResult.FacesDetected) : null,
             UploadedById = userId,
             UploadedAt = DateTime.UtcNow,
-            WorkflowState = AssetWorkflowState.Draft
+            WorkflowState = AssetWorkflowState.Draft,
+            IsPublic = isPublic
         };
 
         _context.Assets.Add(asset);
