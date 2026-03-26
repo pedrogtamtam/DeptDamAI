@@ -4,11 +4,12 @@
 @using DeptDam.Services
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject ApplicationDbContext DbContext
 @inject ITenantService TenantService
 @inject IHttpClientFactory HttpFactory
+@inject IPermissionService PermissionService
 
 <PageTitle>AI Configuration</PageTitle>
 
@@ -17,9 +18,11 @@
         <h1 class="h3 mb-1"><i class="bi bi-robot me-2 text-primary"></i>AI Analysis Configuration</h1>
         <p class="text-secondary small mb-0">Configure Google Gemini AI for automatic image tagging and OCR.</p>
     </div>
-    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-box-arrow-up-right me-1"></i> Get a Gemini API Key
-    </a>
+    <PermissionView Permission="@AppPermissions.SettingsManage">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-box-arrow-up-right me-1"></i> Get a Gemini API Key
+        </a>
+    </PermissionView>
 </div>
 
 @if (showAlert)
@@ -32,84 +35,87 @@
 
 <div class="row g-4">
     <div class="col-lg-7">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white py-3 border-0">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-key-fill text-warning me-2"></i>API Credentials</h5>
-            </div>
-            <div class="card-body p-4">
-                <div class="mb-4">
-                    <label class="form-label fw-bold small text-muted text-uppercase">Google Gemini API Key</label>
-                    <div class="input-group">
-                        <input type="@(showKey ? "text" : "password")"
-                               class="form-control font-monospace"
-                               @bind="settings.GoogleAiApiKey"
-                               @bind:event="oninput"
-                               placeholder="AIza..." />
-                        <button class="btn btn-outline-secondary" type="button" @onclick="() => showKey = !showKey">
-                            <i class="bi bi-@(showKey ? "eye-slash" : "eye")"></i>
-                        </button>
-                    </div>
-                    <small class="text-muted">Your key is stored securely in the database.</small>
+        <PermissionView Permission="@AppPermissions.SettingsManage">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-key-fill text-warning me-2"></i>API Credentials</h5>
                 </div>
-
-                <div class="mb-4">
-                    <label class="form-label fw-bold small text-muted text-uppercase">
-                        Gemini Model
-                        @if (isLoadingModels)
-                        {
-                            <span class="spinner-border spinner-border-sm ms-2 text-primary"></span>
-                        }
-                    </label>
-                    @if (availableModels.Any())
-                    {
-                        <select class="form-select" @bind="settings.GeminiModel">
-                            @foreach (var m in availableModels)
-                            {
-                                <option value="@m.Id">@m.DisplayName (@m.Id)</option>
-                            }
-                        </select>
-                        <small class="text-success"><i class="bi bi-check-circle me-1"></i>@availableModels.Count models loaded from API</small>
-                    }
-                    else
-                    {
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Google Gemini API Key</label>
                         <div class="input-group">
-                            <input type="text" class="form-control" @bind="settings.GeminiModel" placeholder="gemini-2.0-flash" />
-                            <button class="btn btn-outline-primary" type="button" @onclick="LoadModels" disabled="@(string.IsNullOrWhiteSpace(settings.GoogleAiApiKey) || isLoadingModels)">
-                                <i class="bi bi-arrow-repeat"></i> Fetch
+                            <input type="@(showKey ? "text" : "password")"
+                                   class="form-control font-monospace"
+                                   @bind="settings.GoogleAiApiKey"
+                                   @bind:event="oninput"
+                                   placeholder="AIza..." />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => showKey = !showKey">
+                                <i class="bi bi-@(showKey ? "eye-slash" : "eye")"></i>
                             </button>
                         </div>
-                        <small class="text-muted">Enter API key and click Fetch, or Test Connection to auto-populate.</small>
-                    }
-                </div>
-
-                <div class="mb-4">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="autoAnalyze" @bind="settings.AutoAnalyzeOnUpload" />
-                        <label class="form-check-label fw-semibold" for="autoAnalyze">
-                            Auto-analyze images on upload
-                        </label>
+                        <small class="text-muted">Your key is stored securely in the database.</small>
                     </div>
-                    <small class="text-muted ms-5">When enabled, every uploaded image is automatically sent to Gemini for tagging and OCR.</small>
-                </div>
 
-                <div class="d-flex gap-2">
-                    <button class="btn btn-primary px-4" @onclick="SaveSettings">
-                        <i class="bi bi-save me-1"></i> Save Configuration
-                    </button>
-                    <button class="btn btn-outline-secondary" @onclick="TestConnection" disabled="@isTesting">
-                        @if (isTesting)
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">
+                            Gemini Model
+                            @if (isLoadingModels)
+                            {
+                                <span class="spinner-border spinner-border-sm ms-2 text-primary"></span>
+                            }
+                        </label>
+                        @if (availableModels.Any())
                         {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <select class="form-select" @bind="settings.GeminiModel">
+                                @foreach (var m in availableModels)
+                                {
+                                    <option value="@m.Id">@m.DisplayName (@m.Id)</option>
+                                }
+                            </select>
+                            <small class="text-success"><i class="bi bi-check-circle me-1"></i>@availableModels.Count models loaded from API</small>
                         }
                         else
                         {
-                            <i class="bi bi-lightning-charge me-1"></i>
+                            <div class="input-group">
+                                <input type="text" class="form-control" @bind="settings.GeminiModel" placeholder="gemini-2.0-flash" />
+                                <button class="btn btn-outline-primary" type="button" @onclick="LoadModels" disabled="@(string.IsNullOrWhiteSpace(settings.GoogleAiApiKey) || isLoadingModels)">
+                                    <i class="bi bi-arrow-repeat"></i> Fetch
+                            </button>
+                        </div>
+                        <small class="text-muted">Enter API key and click Fetch, or Test Connection to auto-populate.</small>
                         }
-                        Test Connection
-                    </button>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoAnalyze" @bind="settings.AutoAnalyzeOnUpload" />
+                            <label class="form-check-label fw-semibold" for="autoAnalyze">
+                                Auto-analyze images on upload
+                            </label>
+                        </div>
+                        <small class="text-muted ms-5">When enabled, every uploaded image is automatically sent to Gemini for tagging and OCR.</small>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary px-4" @onclick="SaveSettings">
+                            <i class="bi bi-save me-1"></i> Save Configuration
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="TestConnection" disabled="@isTesting">
+                            @if (isTesting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            }
+                            <i class="bi bi-activity me-1"></i> Test Connection
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </PermissionView>
+        <AuthorizeView>
+            <NotAuthorized>
+                <div class="alert alert-warning">You do not have permission to manage AI settings.</div>
+            </NotAuthorized>
+        </AuthorizeView>
     </div>
 
     <div class="col-lg-5">

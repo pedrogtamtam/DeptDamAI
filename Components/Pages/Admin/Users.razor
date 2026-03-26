@@ -1,50 +1,55 @@
 @page "/Admin/Users"
 @using DeptDam.Data
+@using DeptDam.Models
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
 @using DeptDam.Services
-@attribute [Authorize(Roles = "DAM_Admin")]
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<ApplicationRole> RoleManager
 @inject ITenantService TenantService
 @inject ApplicationDbContext DbContext
 @inject ILogger<Users> Logger
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IPermissionService PermissionService
 
 <PageTitle>User Management</PageTitle>
 
 <h3>User Management</h3>
 <div class="row">
-    <div class="col-md-6">
-        <h4>Invite New User</h4>
-        <EditForm Model="InviteModel" OnValidSubmit="InviteUser">
-            <DataAnnotationsValidator />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="InviteModel.Email" class="form-control" autocomplete="email" aria-required="true" placeholder="name@example.com" />
-                <label>Email address</label>
-                <ValidationMessage For="() => InviteModel.Email" class="text-danger" />
-            </div>
-            <button type="submit" class="btn btn-primary">Invite</button>
-            @if (InviteMessage != null)
-            {
-                <div class="alert alert-success mt-2">@InviteMessage</div>
-            }
-            @if (InviteError != null)
-            {
-                <div class="alert alert-danger mt-2">@InviteError</div>
-            }
-        </EditForm>
-    </div>
-    <div class="col-md-6">
+    <PermissionView Permission="@AppPermissions.UsersManage">
+        <div class="col-md-4">
+            <h4>Invite New User</h4>
+            <EditForm Model="InviteModel" OnValidSubmit="InviteUser">
+                <DataAnnotationsValidator />
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="InviteModel.Email" class="form-control" autocomplete="email" aria-required="true" placeholder="name@example.com" />
+                    <label>Email address</label>
+                    <ValidationMessage For="() => InviteModel.Email" class="text-danger" />
+                </div>
+                <button type="submit" class="btn btn-primary">Invite</button>
+                @if (InviteMessage != null)
+                {
+                    <div class="alert alert-success mt-2">@InviteMessage</div>
+                }
+                @if (InviteError != null)
+                {
+                    <div class="alert alert-danger mt-2">@InviteError</div>
+                }
+            </EditForm>
+        </div>
+    </PermissionView>
+    <div class="col-md-8">
         <h4>Existing Users & Roles</h4>
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
                         <th>User</th>
-                        <th>Role</th>
+                        <th>Roles</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -54,22 +59,39 @@
                         <tr>
                             <td class="align-middle">@user.Email</td>
                             <td class="align-middle">
-                                <span class="badge bg-info text-dark">@GetUserRole(user)</span>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var role in GetUserRoles(user))
+                                    {
+                                        <span class="badge bg-info text-dark">@role</span>
+                                    }
+                                </div>
                             </td>
                             <td>
-                                <div class="btn-group">
-                                    <select class="form-select form-select-sm w-auto" @onchange='(e) => ChangeRole(user, e.Value?.ToString() ?? "DAM_Viewer")'>
-                                        <option value="" disabled selected>Assign...</option>
-                                        @if (IsSuperAdmin)
-                                        {
-                                            <option value="SuperAdmin">SuperAdmin</option>
-                                        }
-                                        <option value="DAM_Admin">DAM Admin</option>
-                                        <option value="DAM_Contributor">DAM Contributor</option>
-                                        <option value="DAM_Reviewer">DAM Reviewer</option>
-                                        <option value="DAM_Viewer">DAM Viewer</option>
-                                    </select>
-                                </div>
+                                <PermissionView Permission="@AppPermissions.RolesManage">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" @onclick="() => ToggleDropdown(user.Id)">
+                                            Manage Roles
+                                        </button>
+                                        <div class="dropdown-menu p-3 shadow @(visibleDropdowns.Contains(user.Id) ? "show" : "")" style="min-width: 200px;">
+                                            @foreach (var roleName in AllRoleNames)
+                                            {
+                                                var currentRole = roleName;
+                                                @if (currentRole != "SuperAdmin" || IsSuperAdmin)
+                                                {
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="role_@(user.Id)_@(currentRole)" 
+                                                               checked="@UserRoles[user.Id].Contains(currentRole)"
+                                                               @onchange="@((ChangeEventArgs e) => ToggleRole(user, currentRole, (bool)(e.Value ?? false)))" />
+                                                        <label class="form-check-label small" for="role_@(user.Id)_@(currentRole)">
+                                                            @currentRole
+                                                        </label>
+                                                    </div>
+                                                }
+                                            }
+
+                                        </div>
+                                    </div>
+                                </PermissionView>
                             </td>
                         </tr>
                     }
@@ -85,11 +107,22 @@
     private string? InviteMessage;
     private string? InviteError;
     private bool IsSuperAdmin;
+    private List<string> AllRoleNames = new();
+    private HashSet<string> visibleDropdowns = new();
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         IsSuperAdmin = authState.User.IsInRole("SuperAdmin");
+        
+        var tenantId = TenantService.GetCurrentTenantId();
+        AllRoleNames = await DbContext.Roles
+            .OfType<ApplicationRole>()
+            .Where(r => r.TenantId == tenantId)
+            .OrderBy(r => r.Name)
+            .Select(r => r.Name!)
+            .ToListAsync();
+
         await LoadUsers();
     }
 
@@ -100,19 +133,29 @@
         foreach (var user in TenantUsers)
         {
             var roles = await UserManager.GetRolesAsync(user);
-            UserRoles[user.Id] = roles.FirstOrDefault() ?? "No Role";
+            UserRoles[user.Id] = roles.ToList();
         }
     }
 
-    private Dictionary<string, string> UserRoles = new();
+    private Dictionary<string, List<string>> UserRoles = new();
 
-    private string GetUserRole(ApplicationUser user) => UserRoles.ContainsKey(user.Id) ? UserRoles[user.Id] : "Loading...";
+    private List<string> GetUserRoles(ApplicationUser user) => UserRoles.ContainsKey(user.Id) ? UserRoles[user.Id] : new List<string>();
 
-    private async Task ChangeRole(ApplicationUser user, string roleName)
+    private void ToggleDropdown(string userId)
     {
-        var currentRoles = await UserManager.GetRolesAsync(user);
-        await UserManager.RemoveFromRolesAsync(user, currentRoles);
-        await UserManager.AddToRoleAsync(user, roleName);
+        if (visibleDropdowns.Contains(userId))
+            visibleDropdowns.Remove(userId);
+        else
+            visibleDropdowns.Add(userId);
+    }
+
+    private async Task ToggleRole(ApplicationUser user, string roleName, bool isChecked)
+    {
+        if (isChecked)
+            await UserManager.AddToRoleAsync(user, roleName);
+        else
+            await UserManager.RemoveFromRoleAsync(user, roleName);
+        
         await LoadUsers();
     }
 

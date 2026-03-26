@@ -20,6 +20,8 @@ public class AssetService : IAssetService
     private readonly ITenantService _tenantService;
     private readonly IAiAnalysisService _aiService;
     private readonly IAuditService _auditService;
+    private readonly IBackgroundTaskQueue _taskQueue;
+    private readonly IReAnalysisTracker _tracker;
 
     public AssetService(
         ApplicationDbContext context, 
@@ -27,7 +29,9 @@ public class AssetService : IAssetService
         IHttpContextAccessor httpContextAccessor, 
         ITenantService tenantService,
         IAiAnalysisService aiService,
-        IAuditService auditService)
+        IAuditService auditService,
+        IBackgroundTaskQueue taskQueue,
+        IReAnalysisTracker tracker)
     {
         _context = context;
         _storageProvider = storageProvider;
@@ -35,6 +39,8 @@ public class AssetService : IAssetService
         _tenantService = tenantService;
         _aiService = aiService;
         _auditService = auditService;
+        _taskQueue = taskQueue;
+        _tracker = tracker;
     }
 
     public async Task<Asset> CreateAssetAsync(Stream fileStream, string fileName, string contentType, bool useAi = false)
@@ -348,6 +354,11 @@ public class AssetService : IAssetService
             .FirstOrDefaultAsync(a => a.Id == assetId);
         if (asset == null) return;
 
+        // Ensure the tenant context is set — when called from a background scope there is
+        // no HttpContext or auth state, so GetCurrentTenantId() would return null and the
+        // storage provider would look in the wrong folder.
+        _tenantService.SetCurrentTenantId(asset.TenantId);
+
         using var originalStream = await _storageProvider.GetFileStreamAsync(asset.StorageKey);
         using var ms = new MemoryStream();
         await originalStream.CopyToAsync(ms);
@@ -394,6 +405,24 @@ public class AssetService : IAssetService
         }
 
         await _context.SaveChangesAsync();
+    }
+
+    public Task EnqueueReAnalysisAsync(string assetId)
+    {
+        _tracker.Start(assetId);
+        _taskQueue.Enqueue(async (sp, ct) =>
+        {
+            try
+            {
+                var svc = sp.GetRequiredService<IAssetService>();
+                await svc.ReAnalyzeAssetAsync(assetId);
+            }
+            finally
+            {
+                sp.GetRequiredService<IReAnalysisTracker>().Complete(assetId);
+            }
+        });
+        return Task.CompletedTask;
     }
 
     // ?? Bulk operations ??????????????????????????????????????????????????????

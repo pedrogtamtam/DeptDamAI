@@ -1,0 +1,29 @@
+@using DeptDam.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IPermissionService PermissionService
+
+@if (hasPermission)
+{
+    @ChildContent
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+    [Parameter] public string Permission { get; set; } = string.Empty;
+    [Parameter] public RenderFragment ChildContent { get; set; } = default!;
+
+    private bool hasPermission = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authState = await AuthStateTask;
+        if (authState?.User != null)
+        {
+            hasPermission = await PermissionService.HasPermissionAsync(authState.User, Permission);
+        }
+        else
+        {
+            hasPermission = false;
+        }
+    }
+}

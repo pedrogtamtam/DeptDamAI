@@ -21,9 +21,18 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IAssetService, AssetService>();
 builder.Services.AddScoped<IBrandingService, BrandingService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<DeptDam.Services.Storage.IStorageProvider, DeptDam.Services.Storage.StorageProviderFactory>();
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("GeminiClient", c =>
+{
+    c.Timeout = TimeSpan.FromMinutes(3);
+});
 builder.Services.AddScoped<IAiAnalysisService, GoogleAiAnalysisService>();
+builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
+builder.Services.AddSingleton<IReAnalysisTracker, ReAnalysisTracker>();
+builder.Services.AddHostedService<ReAnalysisBackgroundService>();
+builder.Services.AddScoped<INotificationDispatcher, AzureFunctionNotificationDispatcher>();
 builder.Services.AddScoped<IWatermarkService, WatermarkService>();
 builder.Services.AddSingleton<ApiKeyService>();
 builder.Services.AddScoped<IdentityRedirectManager>();

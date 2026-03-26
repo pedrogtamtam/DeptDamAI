@@ -1,12 +1,13 @@
 @implements IDisposable
-
 @inject NavigationManager NavigationManager
+@inject IPermissionService PermissionService
 
 <div class="nav-menu @(IsCollapsed ? "collapsed" : "")">
+
     <div class="top-row ps-3 navbar navbar-light">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center" href="">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 36" width="120" height="36" aria-label="DEPT®" role="img">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 36" width="120" height="36" aria-label="DEPT®" role="img" class="dept-logo">
                     <text x="4" y="27" font-family="'Arial Black','Helvetica Neue',Helvetica,Arial,sans-serif" font-weight="900" font-size="28" letter-spacing="-1" fill="#ffffff">DEPT</text>
                     <text x="100" y="16" font-family="Arial,Helvetica,sans-serif" font-weight="400" font-size="10" fill="#ffffff">&#174;</text>
                 </svg>
@@ -16,8 +17,9 @@
 
     <div class="nav-scrollable">
         <nav class="nav flex-column">
-            <div class="nav-item px-3 mb-1">
+            <div class="nav-item mb-1">
                 <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+
                     <span class="bi bi-house-door-fill" aria-hidden="true" title="Home"></span>
                     <span class="nav-label">@(Branding?.NavHomeLabel ?? "Home")</span>
                 </NavLink>
@@ -25,104 +27,136 @@
 
             <AuthorizeView Context="topAuthContext">
                 <Authorized>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Assets">
-                            <span class="bi bi-images" aria-hidden="true" title="@(Branding?.NavAssetsLabel ?? "Assets")"></span>
-                            <span class="nav-label">@(Branding?.NavAssetsLabel ?? "Assets")</span>
-                        </NavLink>
-                    </div>
+                    <div class="nav-header mb-2 opacity-50 small fw-bold text-uppercase">Library</div>
+                    <PermissionView Permission="@AppPermissions.AssetsView">
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Assets">
+                                <span class="bi bi-images" aria-hidden="true" title="@(Branding?.NavAssetsLabel ?? "Assets")"></span>
+                                <span class="nav-label">@(Branding?.NavAssetsLabel ?? "Assets")</span>
+                            </NavLink>
+                        </div>
+                    </PermissionView>
 
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Collections">
-                            <span class="bi bi-collection" aria-hidden="true" title="@(Branding?.NavCollectionsLabel ?? "Collections")"></span>
-                            <span class="nav-label">@(Branding?.NavCollectionsLabel ?? "Collections")</span>
-                        </NavLink>
-                    </div>
+                    <PermissionView Permission="@AppPermissions.CollectionsView">
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Collections">
+                                <span class="bi bi-collection" aria-hidden="true" title="@(Branding?.NavCollectionsLabel ?? "Collections")"></span>
+                                <span class="nav-label">@(Branding?.NavCollectionsLabel ?? "Collections")</span>
+                            </NavLink>
+                        </div>
+                    </PermissionView>
 
-                    <div class="nav-item px-3 mb-4">
-                        <NavLink class="nav-link" href="Workflow">
-                            <span class="bi bi-kanban" aria-hidden="true" title="@(Branding?.NavWorkflowLabel ?? "Workflow")"></span>
-                            <span class="nav-label">@(Branding?.NavWorkflowLabel ?? "Workflow")</span>
-                        </NavLink>
-                    </div>
+                    <PermissionView Permission="@AppPermissions.AssetsWorkflow">
+                         <div class="nav-header mb-2 opacity-50 small fw-bold text-uppercase">Operations</div>
+                        <div class="nav-item mb-4">
+                            <NavLink class="nav-link" href="Workflow">
+                                <span class="bi bi-kanban" aria-hidden="true" title="@(Branding?.NavWorkflowLabel ?? "Workflow")"></span>
+                                <span class="nav-label">@(Branding?.NavWorkflowLabel ?? "Workflow")</span>
+                            </NavLink>
+                        </div>
+                    </PermissionView>
 
-                    <div class="nav-header px-4 mb-2 opacity-50 small fw-bold text-uppercase">Admin</div>
 
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/Users">
-                            <span class="bi bi-people-fill" aria-hidden="true" title="Users"></span>
-                            <span class="nav-label">Users</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/Tenants">
-                            <span class="bi bi-diagram-3-fill" aria-hidden="true" title="Workspaces"></span>
-                            <span class="nav-label">Workspaces</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/Tags">
-                            <span class="bi bi-tags-fill" aria-hidden="true" title="Tags"></span>
-                            <span class="nav-label">Tags</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/CustomFields">
-                            <span class="bi bi-textarea-t" aria-hidden="true" title="Metadata"></span>
-                            <span class="nav-label">Metadata</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/ApiClients">
-                            <span class="bi bi-key-fill" aria-hidden="true" title="API Keys"></span>
-                            <span class="nav-label">Integration</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/AiSettings">
-                            <span class="bi bi-robot" aria-hidden="true" title="AI Settings"></span>
-                            <span class="nav-label">AI Settings</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/AuditLog">
-                            <span class="bi bi-journal-text" aria-hidden="true" title="Audit Log"></span>
-                            <span class="nav-label">Audit Log</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/BrandingEditor">
-                            <span class="bi bi-palette-fill" aria-hidden="true" title="Branding"></span>
-                            <span class="nav-label">Branding</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/DownloadPresets">
-                            <span class="bi bi-download" aria-hidden="true" title="Download Presets"></span>
-                            <span class="nav-label">Download Presets</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/SmtpSettings">
-                            <span class="bi bi-envelope-fill" aria-hidden="true" title="Email Settings"></span>
-                            <span class="nav-label">Email Settings</span>
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 mb-1">
-                        <NavLink class="nav-link" href="Admin/StorageSettings">
-                            <span class="bi bi-cloud-arrow-up-fill" aria-hidden="true" title="Storage"></span>
-                            <span class="nav-label">Storage</span>
-                        </NavLink>
-                    </div>
+                    <div class="nav-header mb-2 opacity-50 small fw-bold text-uppercase">Admin: Identity</div>
+                    <PermissionView Permission="@AppPermissions.UsersManage">
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/Users">
+                                <span class="bi bi-people-fill" aria-hidden="true" title="Users"></span>
+                                <span class="nav-label">Users</span>
+                            </NavLink>
+                        </div>
+                    </PermissionView>
+                    
+                    <PermissionView Permission="@AppPermissions.RolesManage">
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/Roles">
+                                <span class="bi bi-shield-lock-fill" aria-hidden="true" title="Roles"></span>
+                                <span class="nav-label">Roles</span>
+                            </NavLink>
+                        </div>
+                    </PermissionView>
+                    
+                    <AuthorizeView Roles="SuperAdmin" Context="superAuthContext">
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/Tenants">
+                                <span class="bi bi-diagram-3-fill" aria-hidden="true" title="Workspaces"></span>
+                                <span class="nav-label">Workspaces</span>
+                            </NavLink>
+                        </div>
+                    </AuthorizeView>
+
+                    <PermissionView Permission="@AppPermissions.SettingsManage">
+                        <div class="nav-header mb-2 mt-2 opacity-50 small fw-bold text-uppercase">Admin: Content</div>
+                         <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/BrandingEditor">
+                                <span class="bi bi-palette-fill" aria-hidden="true" title="Branding"></span>
+                                <span class="nav-label">Branding</span>
+                            </NavLink>
+                        </div>
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/Tags">
+                                <span class="bi bi-tags-fill" aria-hidden="true" title="Tags"></span>
+                                <span class="nav-label">Tags</span>
+                            </NavLink>
+                        </div>
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/CustomFields">
+                                <span class="bi bi-textarea-t" aria-hidden="true" title="Metadata"></span>
+                                <span class="nav-label">Metadata</span>
+                            </NavLink>
+                        </div>
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/DownloadPresets">
+                                <span class="bi bi-download" aria-hidden="true" title="Download Presets"></span>
+                                <span class="nav-label">Download Presets</span>
+                            </NavLink>
+                        </div>
+
+                         <div class="nav-header mb-2 mt-2 opacity-50 small fw-bold text-uppercase">Admin: System</div>
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/ApiClients">
+                                <span class="bi bi-key-fill" aria-hidden="true" title="API Keys"></span>
+                                <span class="nav-label">Integration</span>
+                            </NavLink>
+                        </div>
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/AiSettings">
+                                <span class="bi bi-robot" aria-hidden="true" title="AI Settings"></span>
+                                <span class="nav-label">AI Analysis</span>
+                            </NavLink>
+                        </div>
+                         <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/SmtpSettings">
+                                <span class="bi bi-envelope-fill" aria-hidden="true" title="Email Settings"></span>
+                                <span class="nav-label">Email</span>
+                            </NavLink>
+                        </div>
+                        <div class="nav-item mb-1">
+                            <NavLink class="nav-link" href="Admin/StorageSettings">
+                                <span class="bi bi-cloud-arrow-up-fill" aria-hidden="true" title="Storage"></span>
+                                <span class="nav-label">Storage</span>
+                            </NavLink>
+                        </div>
+                        <PermissionView Permission="@AppPermissions.AuditView">
+                            <div class="nav-item mb-1">
+                                <NavLink class="nav-link" href="Admin/AuditLog">
+                                    <span class="bi bi-journal-text" aria-hidden="true" title="Audit Log"></span>
+                                    <span class="nav-label">Audit Log</span>
+                                </NavLink>
+                            </div>
+                        </PermissionView>
+                    </PermissionView>
+
 
                     <div class="mt-auto">
-                        <div class="nav-item px-3 mb-1">
+                        <div class="nav-item mb-1">
                             <NavLink class="nav-link" href="Account/Manage">
                                 <span class="bi bi-person-fill" aria-hidden="true" title="Profile"></span>
                                 <span class="nav-label">@topAuthContext.User.Identity?.Name</span>
                             </NavLink>
                         </div>
-                        <div class="nav-item px-3 mb-3">
+                        <div class="nav-item mb-3">
+
                             <form action="Account/Logout" method="post">
                                 <AntiforgeryToken />
                                 <input type="hidden" name="ReturnUrl" value="@currentUrl" />
@@ -135,8 +169,9 @@
                     </div>
                 </Authorized>
                 <NotAuthorized>
-                    <div class="nav-item px-3">
+                    <div class="nav-item">
                         <NavLink class="nav-link" href="Account/Login">
+
                             <span class="bi bi-person-badge" aria-hidden="true"></span>
                             <span class="nav-label">Login</span>
                         </NavLink>

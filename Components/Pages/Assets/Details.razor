@@ -13,7 +13,9 @@
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IAssetService AssetService
-@inject IEmailService EmailService
+@inject INotificationDispatcher NotificationDispatcher
+@inject IReAnalysisTracker ReAnalysisTracker
+@implements IDisposable
 
 <PageTitle>Asset Details - @(Asset?.OriginalFileName ?? "Loading...")</PageTitle>
 
@@ -36,11 +38,11 @@ else
                     @if (Asset.ContentType != null && Asset.ContentType.StartsWith("image/"))
                     {
                         <img src="/api/media/@Asset.TenantId/@Asset.StorageKey" class="img-fluid" style="max-height: 600px; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.25);" alt="@Asset.OriginalFileName" />
-                        <AuthorizeView Roles="DAM_Admin,DAM_Contributor">
+                        <PermissionView Permission="@AppPermissions.AssetsEdit">
                             <a href="/Assets/@Asset.Id/Edit" class="btn btn-dark btn-sm position-absolute top-0 end-0 m-3 shadow">
                                 <i class="bi bi-pencil-square me-1"></i> Edit Image
                             </a>
-                        </AuthorizeView>
+                        </PermissionView>
                     }
                     else
                     {
@@ -58,38 +60,43 @@ else
                         <span class="badge bg-light text-dark border">@Asset.ContentType?.ToUpper()</span>
                     </div>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-danger px-3 shadow-sm" @onclick="DeleteAsset">
-                            <i class="bi bi-trash3-fill me-1"></i> Delete Permanent
-                        </button>
-                        <a href="/api/media/@Asset.TenantId/@Asset.StorageKey" target="_blank" class="btn btn-sm btn-primary px-3 shadow-sm" download="@Asset.OriginalFileName">
-                            <i class="bi bi-download me-1"></i> Download
-                        </a>
-                        @if (downloadPresets.Any())
-                        {
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-primary dropdown-toggle px-2 shadow-sm" data-bs-toggle="dropdown">
-                                    <i class="bi bi-chevron-down"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 small">
-                                    <li><h6 class="dropdown-header">Download as…</h6></li>
-                                    @foreach (var preset in downloadPresets)
-                                    {
-                                        var q = preset.Format == "original" ? "" : $"&format={preset.Format}&q={preset.Quality}";
-                                        var w = preset.Width.HasValue ? $"&w={preset.Width}" : "";
-                                        var h = preset.Height.HasValue ? $"&h={preset.Height}" : "";
-                                        <li>
-                                            <a class="dropdown-item" href="/api/media/@Asset.TenantId/@Asset.StorageKey?@($"{w}{h}{q}".TrimStart('&'))" target="_blank" download>
-                                                <i class="bi bi-file-earmark-arrow-down me-1"></i>@preset.Name
-                                                @if (preset.Width.HasValue || preset.Height.HasValue)
-                                                {
-                                                    <small class="text-muted ms-1">(@(preset.Width?.ToString() ?? "auto")×@(preset.Height?.ToString() ?? "auto"))</small>
-                                                }
-                                            </a>
-                                        </li>
-                                    }
-                                </ul>
-                            </div>
-                        }
+                        <PermissionView Permission="@AppPermissions.AssetsDelete">
+                            <button type="button" class="btn btn-sm btn-danger px-3 shadow-sm" @onclick="DeleteAsset">
+                                <i class="bi bi-trash3-fill me-1"></i> Delete Permanent
+                            </button>
+                        </PermissionView>
+                        <PermissionView Permission="@AppPermissions.AssetsDownload">
+                            <a href="/api/media/@Asset.TenantId/@Asset.StorageKey" target="_blank" class="btn btn-sm btn-primary px-3 shadow-sm" download="@Asset.OriginalFileName">
+                                <i class="bi bi-download me-1"></i> Download
+                            </a>
+                            @if (downloadPresets.Any())
+                            {
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle px-2 shadow-sm" @onclick="() => showDownloadDropdown = !showDownloadDropdown">
+                                        <i class="bi bi-chevron-down"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 small @(showDownloadDropdown ? "show" : "")" style="position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate(0px, 32px);">
+                                        <li><h6 class="dropdown-header">Download as…</h6></li>
+                                        @foreach (var preset in downloadPresets)
+                                        {
+                                            var q = preset.Format == "original" ? "" : $"&format={preset.Format}&q={preset.Quality}";
+                                            var w = preset.Width.HasValue ? $"&w={preset.Width}" : "";
+                                            var h = preset.Height.HasValue ? $"&h={preset.Height}" : "";
+                                            <li>
+                                                <a class="dropdown-item" href="/api/media/@Asset.TenantId/@Asset.StorageKey?@($"{w}{h}{q}".TrimStart('&'))" target="_blank" download
+                                                   @onclick="() => showDownloadDropdown = false">
+                                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>@preset.Name
+                                                    @if (preset.Width.HasValue || preset.Height.HasValue)
+                                                    {
+                                                        <small class="text-muted ms-1">(@(preset.Width?.ToString() ?? "auto")×@(preset.Height?.ToString() ?? "auto"))</small>
+                                                    }
+                                                </a>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </PermissionView>
                     </div>
                 </div>
             </div>
@@ -188,8 +195,25 @@ else
                     @* New comment input *@
                     <div class="mt-3 border-top pt-3">
                         <div class="form-text mb-1 small text-muted">Use <code>@("@username")</code> to mention a colleague — they'll receive an email notification.</div>
-                        <textarea class="form-control mb-2" rows="2" @bind="NewCommentBody"
-                                  placeholder="Add a comment or @@mention someone…"></textarea>
+                        <div class="position-relative mb-2">
+                            <textarea class="form-control" rows="2"
+                                      value="@NewCommentBody"
+                                      @oninput="HandleCommentInput"
+                                      placeholder="Add a comment or @@mention someone…"></textarea>
+                            @if (showMentionSuggestions && mentionSuggestions.Any())
+                            {
+                                <ul class="list-group position-absolute shadow-sm" style="z-index:1050;bottom:calc(100% + 2px);left:0;width:220px;max-height:180px;overflow-y:auto;">
+                                    @foreach (var u in mentionSuggestions)
+                                    {
+                                        <li class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-1 px-2 small"
+                                            @onmousedown="() => InsertMention(u)" style="cursor:pointer;">
+                                            <i class="bi bi-person-fill text-primary flex-shrink-0"></i>
+                                            <span>@u.UserName</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
                         <button class="btn btn-primary btn-sm px-4" @onclick="AddComment"
                                 disabled="@string.IsNullOrWhiteSpace(NewCommentBody)">
                             <i class="bi bi-send me-1"></i> Post
@@ -289,6 +313,57 @@ else
                 </div>
             </div>
 
+            <!-- AI Analysis -->
+            @if (Asset.ContentType != null && Asset.ContentType.StartsWith("image/"))
+            {
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title fw-bold mb-0"><i class="bi bi-stars me-2 text-warning"></i>AI Analysis</h5>
+                            <AuthorizeView Roles="DAM_Admin,DAM_Contributor">
+                                <button class="btn btn-sm btn-outline-warning" @onclick="ReAnalyzeAsset" disabled="@isReAnalyzing" title="Re-run AI analysis on this asset">
+                                    @if (isReAnalyzing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Analyzing…</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-arrow-repeat me-1"></i>
+                                        <span>Re-analyze</span>
+                                    }
+                                </button>
+                            </AuthorizeView>
+                        </div>
+                        @if (isReAnalyzing)
+                        {
+                            <p class="small text-muted mb-3"><i class="bi bi-info-circle me-1"></i>Running in the background — this page will refresh automatically when complete.</p>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(Asset.ExtractedText))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label text-muted x-small fw-bold text-uppercase ls-1">Extracted Text (OCR)</label>
+                                <p class="small bg-light rounded-3 p-2 mb-0" style="max-height:100px;overflow-y:auto;white-space:pre-wrap;">@Asset.ExtractedText</p>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(Asset.FacesDetected))
+                        {
+                            <div class="mb-1">
+                                <label class="form-label text-muted x-small fw-bold text-uppercase ls-1">Faces Detected</label>
+                                <p class="small mb-0"><i class="bi bi-person-fill me-1 text-secondary"></i>@Asset.FacesDetected</p>
+                            </div>
+                        }
+
+                        @if (string.IsNullOrWhiteSpace(Asset.ExtractedText) && string.IsNullOrWhiteSpace(Asset.FacesDetected))
+                        {
+                            <p class="small text-muted mb-0">No AI analysis results yet. Click <strong>Re-analyze</strong> to run the AI on this asset.</p>
+                        }
+                    </div>
+                </div>
+            }
+
             <!-- Sharing Creation Box -->
             <div class="card border-0 shadow-sm mb-4 border-start border-4 border-success">
                 <div class="card-body p-4">
@@ -336,14 +411,23 @@ else
     private List<CustomField> AllCustomFields = new();
     private List<AssetComment> Comments = new();
     private string NewCommentBody = "";
+    private List<Data.ApplicationUser> allUsers = new();
+    private List<Data.ApplicationUser> mentionSuggestions = new();
+    private bool showMentionSuggestions;
+    private System.Threading.Timer? _pollingTimer;
     private bool ShareLinkCreated;
     private string NewShareUrl = "";
     private string ShareLinkLabel = "";
     private bool isReAnalyzing;
     private bool ShowStatusDropdown;
+    private bool showDownloadDropdown;
     private List<DeptDam.Models.DownloadPreset> downloadPresets = new();
 
-    protected override async Task OnInitializedAsync() => await LoadAsset();
+    protected override async Task OnInitializedAsync()
+    {
+        allUsers = await DbContext.Users.OrderBy(u => u.UserName).ToListAsync();
+        await LoadAsset();
+    }
 
     private void ToggleStatusDropdown() => ShowStatusDropdown = !ShowStatusDropdown;
 
@@ -384,6 +468,18 @@ else
         Asset.WorkflowState = s;
         ShowStatusDropdown = false;
         await DbContext.SaveChangesAsync();
+
+        if (s == AssetWorkflowState.InReview && Asset.UploadedBy?.Email != null)
+        {
+            await NotificationDispatcher.SendStatusChangeAsync(
+                Asset.UploadedBy.Email,
+                Asset.UploadedBy.UserName ?? Asset.UploadedBy.Email,
+                Asset.OriginalFileName,
+                Asset.Id,
+                "In Review",
+                NavManager.BaseUri);
+        }
+
         await LoadAsset();
     }
 
@@ -470,6 +566,9 @@ else
         var matches = System.Text.RegularExpressions.Regex.Matches(body, @"@([\w.]+)");
         if (!matches.Any()) return;
 
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var fromUsername = authState.User.Identity?.Name ?? "Someone";
+
         var usernames = matches.Select(m => m.Groups[1].Value).Distinct(StringComparer.OrdinalIgnoreCase);
         foreach (var username in usernames)
         {
@@ -477,18 +576,14 @@ else
                 .FirstOrDefaultAsync(u => u.UserName != null && u.UserName.ToLower().Contains(username.ToLower()));
             if (user?.Email == null) continue;
 
-            try
-            {
-                await EmailService.SendEmailAsync(
-                    user.Email,
-                    $"You were mentioned in a comment on \"{asset.OriginalFileName}\"",
-                    $"<p>Hi {user.UserName},</p>" +
-                    $"<p>You were mentioned in a comment on asset <strong>{System.Net.WebUtility.HtmlEncode(asset.OriginalFileName)}</strong>:</p>" +
-                    $"<blockquote style='border-left:3px solid #ccc;padding-left:1em;color:#555;'>" +
-                    $"{System.Net.WebUtility.HtmlEncode(body)}</blockquote>" +
-                    $"<p><a href='/Assets/{asset.Id}'>View asset ?</a></p>");
-            }
-            catch { /* email not configured — silently ignore */ }
+            await NotificationDispatcher.SendMentionAsync(
+                user.Email,
+                user.UserName ?? username,
+                fromUsername,
+                asset.OriginalFileName,
+                asset.Id,
+                body.Length > 200 ? body[..200] + "…" : body,
+                NavManager.BaseUri);
         }
     }
 
@@ -502,6 +597,62 @@ else
 
     private async Task CopyShareUrl() => await JS.InvokeVoidAsync("navigator.clipboard.writeText", NewShareUrl);
     private async Task CopyDirectUrl(string tok) => await JS.InvokeVoidAsync("navigator.clipboard.writeText", $"{NavManager.BaseUri.TrimEnd('/')}/share/{tok}");
+
+    private async Task ReAnalyzeAsset()
+    {
+        if (Asset == null) return;
+        isReAnalyzing = true;
+        await AssetService.EnqueueReAnalysisAsync(Asset.Id);
+        StartPolling();
+    }
+
+    private void StartPolling()
+    {
+        _pollingTimer?.Dispose();
+        _pollingTimer = new System.Threading.Timer(async _ =>
+        {
+            if (Asset == null || !ReAnalysisTracker.IsRunning(Asset.Id))
+            {
+                _pollingTimer?.Dispose();
+                _pollingTimer = null;
+                await InvokeAsync(async () =>
+                {
+                    await LoadAsset();
+                    isReAnalyzing = false;
+                    StateHasChanged();
+                });
+            }
+        }, null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+    }
+
+    private void HandleCommentInput(ChangeEventArgs e)
+    {
+        NewCommentBody = e.Value?.ToString() ?? "";
+        var match = System.Text.RegularExpressions.Regex.Match(NewCommentBody, @"@([\w.]*) *$");
+        if (match.Success)
+        {
+            var filter = match.Groups[1].Value;
+            mentionSuggestions = allUsers
+                .Where(u => u.UserName != null &&
+                            (filter.Length == 0 || u.UserName.StartsWith(filter, StringComparison.OrdinalIgnoreCase)))
+                .Take(6).ToList();
+            showMentionSuggestions = mentionSuggestions.Any();
+        }
+        else
+        {
+            showMentionSuggestions = false;
+            mentionSuggestions.Clear();
+        }
+    }
+
+    private void InsertMention(Data.ApplicationUser user)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(NewCommentBody, @"@[\w.]*$");
+        if (match.Success)
+            NewCommentBody = NewCommentBody[..match.Index] + "@" + user.UserName + " ";
+        showMentionSuggestions = false;
+        mentionSuggestions.Clear();
+    }
 
     private async Task DeleteAsset() { if (Asset != null && await JS.InvokeAsync<bool>("confirm", "This will permanently delete the asset and ALL versions and comments. Are you sure?")) { await AssetService.DeleteAssetAsync(Asset.Id); NavManager.NavigateTo("/Assets"); } }
     
@@ -529,6 +680,8 @@ else
         AssetWorkflowState.InReview => "bi-eye-fill",
         _ => "bi-pencil-fill"
     };
+
+    public void Dispose() => _pollingTimer?.Dispose();
 
     public class AssetEditModel { public string OriginalFileName { get; set; } = ""; public DateTime? ExpiresAt { get; set; } }
 }

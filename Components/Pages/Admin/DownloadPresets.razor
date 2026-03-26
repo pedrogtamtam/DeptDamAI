@@ -4,10 +4,11 @@
 @using DeptDam.Services
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject ApplicationDbContext DbContext
 @inject ITenantService TenantService
+@inject IPermissionService PermissionService
 
 <PageTitle>Download Presets</PageTitle>
 
@@ -16,9 +17,11 @@
         <h1 class="h3 mb-1"><i class="bi bi-download me-2 text-primary"></i>Download Presets</h1>
         <p class="text-secondary small mb-0">Define reusable size and format combinations users can pick when downloading an asset.</p>
     </div>
-    <button class="btn btn-primary" @onclick="AddNew">
-        <i class="bi bi-plus-lg me-1"></i> New Preset
-    </button>
+    <PermissionView Permission="@AppPermissions.SettingsManage">
+        <button class="btn btn-primary" @onclick="AddNew">
+            <i class="bi bi-plus-lg me-1"></i> New Preset
+        </button>
+    </PermissionView>
 </div>
 
 @if (showAlert)
@@ -70,12 +73,14 @@
                                     <td><span class="badge bg-secondary-subtle text-secondary text-uppercase">@preset.Format</span></td>
                                     <td class="text-muted">@(preset.Format == "original" ? "–" : $"{preset.Quality}%")</td>
                                     <td class="text-end pe-4">
-                                        <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => StartEdit(preset)">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(preset)">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                        <PermissionView Permission="@AppPermissions.SettingsManage">
+                                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => StartEdit(preset)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(preset)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </PermissionView>
                                     </td>
                                 </tr>
                             }
@@ -88,72 +93,74 @@
 
     @if (editing != null)
     {
-        <div class="col-lg-5">
-            <div class="card border-0 shadow-sm border-start border-primary border-3">
-                <div class="card-header bg-white py-3 border-0">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="bi bi-pencil-square text-primary me-2"></i>
-                        @(string.IsNullOrEmpty(editing.Id) || !presets.Any(p => p.Id == editing.Id) ? "New Preset" : "Edit Preset")
-                    </h5>
-                </div>
-                <div class="card-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Name</label>
-                        <input type="text" class="form-control" @bind="editing.Name" placeholder="Web Thumbnail" maxlength="100" />
+        <PermissionView Permission="@AppPermissions.SettingsManage">
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm border-start border-primary border-3">
+                    <div class="card-header bg-white py-3 border-0">
+                        <h5 class="mb-0 fw-bold">
+                            <i class="bi bi-pencil-square text-primary me-2"></i>
+                            @(string.IsNullOrEmpty(editing.Id) || !presets.Any(p => p.Id == editing.Id) ? "New Preset" : "Edit Preset")
+                        </h5>
                     </div>
-
-                    <div class="row g-3 mb-3">
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Width (px)</label>
-                            <input type="number" class="form-control" @bind="editing.Width" placeholder="Leave blank = auto" min="1" max="10000" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Height (px)</label>
-                            <input type="number" class="form-control" @bind="editing.Height" placeholder="Leave blank = auto" min="1" max="10000" />
-                        </div>
-                    </div>
-                    <div class="form-text mb-3">Set one dimension and leave the other blank to preserve aspect ratio.</div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Format</label>
-                        <select class="form-select" @bind="editing.Format">
-                            <option value="original">Original (no conversion)</option>
-                            <option value="jpeg">JPEG</option>
-                            <option value="png">PNG</option>
-                            <option value="webp">WebP</option>
-                        </select>
-                    </div>
-
-                    @if (editing.Format != "original")
-                    {
+                    <div class="card-body p-4">
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted text-uppercase">
-                                Quality — @editing.Quality%
-                            </label>
-                            <input type="range" class="form-range" @bind="editing.Quality" min="10" max="100" step="5" />
-                            <div class="d-flex justify-content-between">
-                                <small class="text-muted">10% (smallest)</small>
-                                <small class="text-muted">100% (best)</small>
+                            <label class="form-label fw-bold small text-muted text-uppercase">Name</label>
+                            <input type="text" class="form-control" @bind="editing.Name" placeholder="Web Thumbnail" maxlength="100" />
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Width (px)</label>
+                                <input type="number" class="form-control" @bind="editing.Width" placeholder="Leave blank = auto" min="1" max="10000" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Height (px)</label>
+                                <input type="number" class="form-control" @bind="editing.Height" placeholder="Leave blank = auto" min="1" max="10000" />
                             </div>
                         </div>
-                    }
+                        <div class="form-text mb-3">Set one dimension and leave the other blank to preserve aspect ratio.</div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Sort Order</label>
-                        <input type="number" class="form-control" @bind="editing.SortOrder" min="0" />
-                    </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Format</label>
+                            <select class="form-select" @bind="editing.Format">
+                                <option value="original">Original (no conversion)</option>
+                                <option value="jpeg">JPEG</option>
+                                <option value="png">PNG</option>
+                                <option value="webp">WebP</option>
+                            </select>
+                        </div>
 
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-primary px-4" @onclick="Save" disabled="@string.IsNullOrWhiteSpace(editing.Name)">
-                            <i class="bi bi-save me-1"></i> Save
-                        </button>
-                        <button class="btn btn-outline-secondary" @onclick="() => editing = null">
-                            Cancel
-                        </button>
+                        @if (editing.Format != "original")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted text-uppercase">
+                                    Quality — @editing.Quality%
+                                </label>
+                                <input type="range" class="form-range" @bind="editing.Quality" min="10" max="100" step="5" />
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">10% (smallest)</small>
+                                    <small class="text-muted">100% (best)</small>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Sort Order</label>
+                            <input type="number" class="form-control" @bind="editing.SortOrder" min="0" />
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary px-4" @onclick="Save" disabled="@string.IsNullOrWhiteSpace(editing.Name)">
+                                <i class="bi bi-save me-1"></i> Save
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="() => editing = null">
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </PermissionView>
     }
 </div>
 

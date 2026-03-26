@@ -3,10 +3,12 @@
 @using DeptDam.Models
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "DAM_Admin")]
+@using DeptDam.Services
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject ApplicationDbContext DbContext
 @inject DeptDam.Services.ITenantService TenantService
+@inject IPermissionService PermissionService
 
 <PageTitle>Metadata Settings</PageTitle>
 
@@ -15,11 +17,13 @@
         <h1 class="h3 mb-0">Custom Metadata Schema</h1>
         <p class="text-secondary small mb-0">Define reusable metadata fields for assets in your organization.</p>
     </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-primary" @onclick="ShowCreateForm">
-            <i class="bi bi-plus-lg me-1"></i> Add Custom Field
-        </button>
-    </div>
+    <PermissionView Permission="@AppPermissions.SettingsManage">
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" @onclick="ShowCreateForm">
+                <i class="bi bi-plus-lg me-1"></i> Add Custom Field
+            </button>
+        </div>
+    </PermissionView>
 </div>
 
 @if (ShowAlert)
@@ -66,9 +70,11 @@
                                     <small class="text-muted">@(field.FieldType == FieldType.Dropdown ? field.Options : "—")</small>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" @onclick="() => ConfirmDelete(field)">
-                                        <i class="bi bi-trash-fill me-1"></i> Delete
-                                    </button>
+                                    <PermissionView Permission="@AppPermissions.SettingsManage">
+                                        <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" @onclick="() => ConfirmDelete(field)">
+                                            <i class="bi bi-trash-fill me-1"></i> Delete
+                                        </button>
+                                    </PermissionView>
                                 </td>
                             </tr>
                         }

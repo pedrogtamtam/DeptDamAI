@@ -44,15 +44,21 @@ public static class DbSeeder
             string[] roles = { "SuperAdmin", "DAM_Admin", "DAM_Contributor", "DAM_Reviewer", "DAM_Viewer" };
             foreach (var roleName in roles)
             {
-                var roleExists = await context.Roles.IgnoreQueryFilters().AnyAsync(r => r.Name == roleName && ((ApplicationRole)r).TenantId == tenant.Id);
-                if (!roleExists)
+                var role = await context.Roles.IgnoreQueryFilters().OfType<ApplicationRole>().FirstOrDefaultAsync(r => r.Name == roleName && r.TenantId == tenant.Id);
+                if (role == null)
                 {
-                    context.Roles.Add(new ApplicationRole 
+                    role = new ApplicationRole 
                     { 
                         Name = roleName, 
                         NormalizedName = roleName.ToUpperInvariant(),
-                        TenantId = tenant.Id 
-                    });
+                        TenantId = tenant.Id,
+                        Permissions = AppPermissions.GetDefaultPermissions(roleName)
+                    };
+                    context.Roles.Add(role);
+                }
+                else if (role.Permissions == null || role.Permissions.Count == 0)
+                {
+                    role.Permissions = AppPermissions.GetDefaultPermissions(roleName);
                 }
             }
             await context.SaveChangesAsync();

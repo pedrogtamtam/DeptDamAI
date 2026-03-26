@@ -4,11 +4,12 @@
 @using DeptDam.Services
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject ApplicationDbContext DbContext
 @inject ITenantService TenantService
 @inject IEmailService EmailService
+@inject IPermissionService PermissionService
 
 <PageTitle>Email Configuration</PageTitle>
 
@@ -29,119 +30,126 @@
 
 <div class="row g-4">
     <div class="col-lg-7">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white py-3 border-0">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-gear-fill text-warning me-2"></i>Server Settings</h5>
-            </div>
-            <div class="card-body p-4">
-                <div class="mb-4">
-                    <label class="form-label fw-bold small text-muted text-uppercase">Method</label>
-                    <select class="form-select" @bind="settings.AuthMethod">
-                        <option value="Basic">SMTP – Basic (Username &amp; Password)</option>
-                    </select>
+        <PermissionView Permission="@AppPermissions.SettingsManage">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-gear-fill text-warning me-2"></i>Server Settings</h5>
                 </div>
-
-                @if (settings.AuthMethod == "Basic")
-                {
+                <div class="card-body p-4">
                     <div class="mb-4">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Quick Setup</label>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-danger @(activePreset == "gmail" ? "active" : "")" @onclick='() => ApplyPreset("gmail")'>
-                                <i class="bi bi-google me-1"></i> Gmail
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary @(activePreset == "custom" ? "active" : "")" @onclick='() => ApplyPreset("custom")'>
-                                <i class="bi bi-sliders me-1"></i> Custom
+                        <label class="form-label fw-bold small text-muted text-uppercase">Method</label>
+                        <select class="form-select" @bind="settings.AuthMethod">
+                            <option value="Basic">SMTP – Basic (Username &amp; Password)</option>
+                        </select>
+                    </div>
+
+                    @if (settings.AuthMethod == "Basic")
+                    {
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Quick Setup</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-danger @(activePreset == "gmail" ? "active" : "")" @onclick='() => ApplyPreset("gmail")'>
+                                    <i class="bi bi-google me-1"></i> Gmail
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary @(activePreset == "custom" ? "active" : "")" @onclick='() => ApplyPreset("custom")'>
+                                    <i class="bi bi-sliders me-1"></i> Custom
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (activePreset == "gmail")
+                        {
+                            <div class="alert alert-danger small mb-3 py-2">
+                                <i class="bi bi-google me-1"></i>
+                                <strong>Gmail requires an App Password</strong> — your regular password won't work.
+                                <a href="https://myaccount.google.com/apppasswords" target="_blank" class="alert-link">Generate one here</a>
+                                (requires 2-Step Verification to be enabled on your Google account).
+                            </div>
+                        }
+                    }
+
+                    @if (settings.AuthMethod == "Basic")
+                    {
+                        <div class="row mb-3">
+                            <div class="col-8">
+                                <label class="form-label fw-bold small text-muted text-uppercase">SMTP Host</label>
+                                <input type="text" class="form-control" @bind="settings.Host" placeholder="smtp.gmail.com" />
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Port</label>
+                                <input type="number" class="form-control" @bind="settings.Port" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enableSsl" @bind="settings.EnableSsl" />
+                                <label class="form-check-label fw-semibold" for="enableSsl">Enable SSL/TLS</label>
+                            </div>
+                        </div>
+                    }
+
+                    <hr class="my-4" />
+                    <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2"></i>Credentials</h6>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Username</label>
+                        <input type="text" class="form-control" @bind="settings.Username" placeholder="user@example.com" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Password</label>
+                        <div class="input-group">
+                            <input type="@(showPassword ? "text" : "password")" class="form-control font-monospace" @bind="settings.Password" placeholder="••••••••" />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => showPassword = !showPassword">
+                                <i class="bi bi-@(showPassword ? "eye-slash" : "eye")"></i>
                             </button>
                         </div>
                     </div>
 
-                    @if (activePreset == "gmail")
-                    {
-                        <div class="alert alert-danger small mb-3 py-2">
-                            <i class="bi bi-google me-1"></i>
-                            <strong>Gmail requires an App Password</strong> — your regular password won't work.
-                            <a href="https://myaccount.google.com/apppasswords" target="_blank" class="alert-link">Generate one here</a>
-                            (requires 2-Step Verification to be enabled on your Google account).
-                        </div>
-                    }
-                }
+                    <hr class="my-4" />
 
-                @if (settings.AuthMethod == "Basic")
-                {
-                    <div class="row mb-3">
-                        <div class="col-8">
-                            <label class="form-label fw-bold small text-muted text-uppercase">SMTP Host</label>
-                            <input type="text" class="form-control" @bind="settings.Host" placeholder="smtp.gmail.com" />
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Port</label>
-                            <input type="number" class="form-control" @bind="settings.Port" />
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">From Email</label>
+                        <input type="email" class="form-control" @bind="settings.FromEmail" placeholder="noreply@example.com" />
                     </div>
 
                     <div class="mb-3">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="enableSsl" @bind="settings.EnableSsl" />
-                            <label class="form-check-label fw-semibold" for="enableSsl">Enable SSL/TLS</label>
-                        </div>
+                        <label class="form-label fw-bold small text-muted text-uppercase">From Display Name</label>
+                        <input type="text" class="form-control" @bind="settings.FromName" placeholder="DeptDAM" />
                     </div>
-                }
 
-                <hr class="my-4" />
-                <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2"></i>Credentials</h6>
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enableSmtp" @bind="settings.IsEnabled" />
+                            <label class="form-check-label fw-semibold" for="enableSmtp">Enable email sending</label>
+                        </div>
+                        <small class="text-muted ms-5">When disabled, emails will be silently skipped.</small>
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-muted text-uppercase">Username</label>
-                    <input type="text" class="form-control" @bind="settings.Username" placeholder="user@example.com" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-muted text-uppercase">Password</label>
-                    <div class="input-group">
-                        <input type="@(showPassword ? "text" : "password")" class="form-control font-monospace" @bind="settings.Password" placeholder="••••••••" />
-                        <button class="btn btn-outline-secondary" type="button" @onclick="() => showPassword = !showPassword">
-                            <i class="bi bi-@(showPassword ? "eye-slash" : "eye")"></i>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary px-4" @onclick="SaveSettings">
+                            <i class="bi bi-save me-1"></i> Save Configuration
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="TestConnection" disabled="@isTesting">
+                            @if (isTesting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-lightning-charge me-1"></i>
+                            }
+                            Send Test Email
                         </button>
                     </div>
                 </div>
-
-                <hr class="my-4" />
-
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-muted text-uppercase">From Email</label>
-                    <input type="email" class="form-control" @bind="settings.FromEmail" placeholder="noreply@example.com" />
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-muted text-uppercase">From Display Name</label>
-                    <input type="text" class="form-control" @bind="settings.FromName" placeholder="DeptDAM" />
-                </div>
-
-                <div class="mb-4">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="enableSmtp" @bind="settings.IsEnabled" />
-                        <label class="form-check-label fw-semibold" for="enableSmtp">Enable email sending</label>
-                    </div>
-                    <small class="text-muted ms-5">When disabled, emails will be silently skipped.</small>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <button class="btn btn-primary px-4" @onclick="SaveSettings">
-                        <i class="bi bi-save me-1"></i> Save Configuration
-                    </button>
-                    <button class="btn btn-outline-secondary" @onclick="TestConnection" disabled="@isTesting">
-                        @if (isTesting)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                        }
-                        else
-                        {
-                            <i class="bi bi-lightning-charge me-1"></i>
-                        }
-                        Send Test Email
-                    </button>
-                </div>
             </div>
-        </div>
+        </PermissionView>
+        <AuthorizeView>
+            <NotAuthorized>
+                <div class="alert alert-warning">You do not have permission to manage email settings.</div>
+            </NotAuthorized>
+        </AuthorizeView>
     </div>
 
     <div class="col-lg-5">

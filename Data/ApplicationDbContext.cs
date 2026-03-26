@@ -1,8 +1,10 @@
 using System.Linq.Expressions;
+using System.Text.Json;
 using DeptDam.Models;
 using DeptDam.Services;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace DeptDam.Data;
 
@@ -18,7 +20,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     }
 
     public DbSet<Tenant> Tenants { get; set; }
-    public DbSet<UserGroup> UserGroups { get; set; }
     public DbSet<ApiClient> ApiClients { get; set; }
     public DbSet<Asset> Assets { get; set; }
     public DbSet<Tag> Tags { get; set; }
@@ -101,14 +102,23 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 // Add unique index per tenant for roles
                 b.HasIndex("NormalizedName", "TenantId").HasDatabaseName("RoleNameIndex").IsUnique();
                 b.HasOne(r => r.Tenant).WithMany().HasForeignKey(r => r.TenantId).OnDelete(DeleteBehavior.Restrict);
+
+                var permissionsComparer = new ValueComparer<List<string>>(
+                    (c1, c2) => (c1 ?? new List<string>()).SequenceEqual(c2 ?? new List<string>()),
+                    c => (c ?? new List<string>()).Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => (c ?? new List<string>()).ToList());
+
+                b.Property(r => r.Permissions)
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
+                        v => string.IsNullOrEmpty(v)
+                            ? new List<string>()
+                            : JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions)null) ?? new List<string>())
+                    .Metadata.SetValueComparer(permissionsComparer);
+                
+                b.Property(r => r.Permissions).HasColumnName("Permissions");
             });
         }
-
-        builder.Entity<UserGroup>(b => 
-        {
-            b.HasIndex("Name", "TenantId").IsUnique();
-            b.HasOne(g => g.Tenant).WithMany().HasForeignKey(g => g.TenantId).OnDelete(DeleteBehavior.Restrict);
-        });
 
         builder.Entity<AssetTag>(b =>
         {
@@ -175,7 +185,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             b.HasIndex(sl => sl.Token).IsUnique();
             b.HasOne(sl => sl.Tenant).WithMany().HasForeignKey(sl => sl.TenantId).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne(sl => sl.Asset).WithMany().HasForeignKey(sl => sl.AssetId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(sl => sl.Asset).WithMany(a => a.ShareLinks).HasForeignKey(sl => sl.AssetId).OnDelete(DeleteBehavior.Cascade);
             b.HasOne(sl => sl.CreatedBy).WithMany().HasForeignKey(sl => sl.CreatedById).OnDelete(DeleteBehavior.Restrict);
         });
 

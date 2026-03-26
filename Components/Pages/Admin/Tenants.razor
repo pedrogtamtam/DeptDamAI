@@ -101,12 +101,18 @@
         await DbContext.SaveChangesAsync();
 
         // Setup the baseline security schema for the new isolated container
-        string[] roleNames = { "SuperAdmin", "DAM_Admin", "DAM_Contributor", "DAM_Viewer" };
+        string[] roleNames = { "SuperAdmin", "DAM_Admin", "DAM_Contributor", "DAM_Reviewer", "DAM_Viewer" };
         var roleDict = new Dictionary<string, ApplicationRole>();
         
         foreach (var rName in roleNames)
         {
-            var role = new ApplicationRole { Name = rName, NormalizedName = rName.ToUpperInvariant(), TenantId = newTenant.Id };
+            var role = new ApplicationRole 
+            { 
+                Name = rName, 
+                NormalizedName = rName.ToUpperInvariant(), 
+                TenantId = newTenant.Id,
+                Permissions = AppPermissions.GetDefaultPermissions(rName)
+            };
             DbContext.Roles.Add(role);
             roleDict[rName] = role;
         }
@@ -168,6 +174,7 @@
             await DbContext.AssetMetadataValues.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
             await DbContext.AssetTags.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
             await DbContext.CollectionTags.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
+
             await DbContext.Tags.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
             await DbContext.Assets.Where(x => x.TenantId == tid).ExecuteDeleteAsync();
             await DbContext.Collections.Where(x => x.TenantId == tid).ExecuteDeleteAsync();

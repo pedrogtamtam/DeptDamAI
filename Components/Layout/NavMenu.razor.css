@@ -59,11 +59,14 @@
 .nav-header {
     white-space: nowrap;
     overflow: hidden;
-    transition: opacity 0.2s;
+    transition: all 0.2s;
+    padding: 0 1rem;
 }
 
 .collapsed .nav-header {
     opacity: 0;
+    padding: 0;
+    width: 0;
 }
 
 .nav-item {

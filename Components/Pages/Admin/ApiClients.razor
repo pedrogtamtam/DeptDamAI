@@ -4,33 +4,36 @@
 @using DeptDam.Services
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
-@attribute [Authorize(Roles = "DAM_Admin")]
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject ApplicationDbContext DbContext
 @inject ApiKeyService ApiKeyService
 @inject ITenantService TenantService
+@inject IPermissionService PermissionService
 
 <PageTitle>API Clients</PageTitle>
 
 <h3>API Clients</h3>
 
 <div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">Create New API Client</div>
-            <div class="card-body">
-                <EditForm Model="NewClientModel" OnValidSubmit="CreateClient">
-                    <DataAnnotationsValidator />
-                    <div class="form-floating mb-3">
-                        <InputText @bind-Value="NewClientModel.Name" class="form-control" autocomplete="off" placeholder="Client Name" />
-                        <label>Client Name</label>
-                        <ValidationMessage For="() => NewClientModel.Name" class="text-danger" />
-                    </div>
-                    <button type="submit" class="btn btn-primary">Generate Keys</button>
-                </EditForm>
+    <PermissionView Permission="@AppPermissions.SettingsManage">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Create New API Client</div>
+                <div class="card-body">
+                    <EditForm Model="NewClientModel" OnValidSubmit="CreateClient">
+                        <DataAnnotationsValidator />
+                        <div class="form-floating mb-3">
+                            <InputText @bind-Value="NewClientModel.Name" class="form-control" autocomplete="off" placeholder="Client Name" />
+                            <label>Client Name</label>
+                            <ValidationMessage For="() => NewClientModel.Name" class="text-danger" />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Generate Keys</button>
+                    </EditForm>
+                </div>
             </div>
         </div>
-    </div>
+    </PermissionView>
 </div>
 
 @if (NewlyGeneratedSecret != null)
@@ -51,7 +54,9 @@
             <th>Name</th>
             <th>Client ID</th>
             <th>Created At</th>
-            <th>Action</th>
+            <PermissionView Permission="@AppPermissions.SettingsManage">
+                <th>Action</th>
+            </PermissionView>
         </tr>
     </thead>
     <tbody>
@@ -61,9 +66,11 @@
                 <td>@client.Name</td>
                 <td><code>@client.ClientId</code></td>
                 <td>@client.CreatedAt.ToLocalTime().ToString("g")</td>
-                <td>
-                    <button class="btn btn-danger btn-sm" @onclick="() => RevokeClient(client)">Revoke</button>
-                </td>
+                <PermissionView Permission="@AppPermissions.SettingsManage">
+                    <td>
+                        <button class="btn btn-danger btn-sm" @onclick="() => RevokeClient(client)">Revoke</button>
+                    </td>
+                </PermissionView>
             </tr>
         }
     </tbody>

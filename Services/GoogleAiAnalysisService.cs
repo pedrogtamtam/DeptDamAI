@@ -101,7 +101,7 @@ public class GoogleAiAnalysisService : IAiAnalysisService
                 }
             };
 
-            var client = _httpFactory.CreateClient();
+            var client = _httpFactory.CreateClient("GeminiClient");
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
             var json = JsonSerializer.Serialize(payload);

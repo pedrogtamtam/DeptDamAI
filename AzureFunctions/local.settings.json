@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Smtp__Host": "smtp.example.com",
+    "Smtp__Port": "587",
+    "Smtp__User": "notifications@example.com",
+    "Smtp__Password": "",
+    "Smtp__From": "DeptDam Notifications <notifications@example.com>",
+    "Smtp__EnableSsl": "true"
+  }
+}

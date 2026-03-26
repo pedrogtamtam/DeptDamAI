@@ -45,9 +45,11 @@
                 <span class="badge bg-primary ms-1">@ActiveFilterCount</span>
             }
         </button>
-        <a href="/Assets/Upload" class="btn btn-primary px-4 d-flex align-items-center">
-            <i class="bi bi-upload me-2"></i> Upload
-        </a>
+        <PermissionView Permission="@AppPermissions.AssetsUpload">
+            <a href="/Assets/Upload" class="btn btn-primary px-4 d-flex align-items-center">
+                <i class="bi bi-upload me-2"></i> Upload
+            </a>
+        </PermissionView>
     </div>
 </div>
 
@@ -628,26 +630,37 @@ else
         _suggestCts = new System.Threading.CancellationTokenSource();
         var token = _suggestCts.Token;
 
-        await Task.Delay(200, token).ContinueWith(async t =>
+        try
         {
-            if (t.IsCanceled || string.IsNullOrWhiteSpace(q) || q.Length < 2) { await InvokeAsync(() => { suggestions.Clear(); showSuggestions = false; StateHasChanged(); }); return; }
-            var term = q.ToLower();
-            var assetHits = await DbContext.Assets
-                .Where(a => a.OriginalFileName.ToLower().Contains(term))
-                .OrderByDescending(a => a.UploadedAt).Take(5)
-                .Select(a => new SearchSuggestion { Label = a.OriginalFileName, Type = "asset", Id = a.Id })
-                .ToListAsync();
-            var tagHits = await DbContext.Tags
-                .Where(t => t.Name.ToLower().Contains(term)).Take(3)
-                .Select(t => new SearchSuggestion { Label = t.Name, Type = "tag", Id = t.Id })
-                .ToListAsync();
-            await InvokeAsync(() =>
-            {
-                suggestions = assetHits.Concat(tagHits).Take(8).ToList();
-                showSuggestions = suggestions.Any();
-                StateHasChanged();
-            });
-        }, System.Threading.Tasks.TaskContinuationOptions.NotOnCanceled);
+            await Task.Delay(200, token); // debounce
+        }
+        catch (OperationCanceledException)
+        {
+            return; // superseded by a newer keystroke
+        }
+
+        if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+        {
+            suggestions.Clear();
+            showSuggestions = false;
+            return;
+        }
+
+        var term = q.ToLower();
+
+        var assetHits = await DbContext.Assets
+            .Where(a => a.OriginalFileName.ToLower().Contains(term))
+            .OrderByDescending(a => a.UploadedAt).Take(5)
+            .Select(a => new SearchSuggestion { Label = a.OriginalFileName, Type = "asset", Id = a.Id })
+            .ToListAsync(token);
+
+        var tagHits = await DbContext.Tags
+            .Where(t => t.Name.ToLower().Contains(term)).Take(3)
+            .Select(t => new SearchSuggestion { Label = t.Name, Type = "tag", Id = t.Id })
+            .ToListAsync(token);
+
+        suggestions = assetHits.Concat(tagHits).Take(8).ToList();
+        showSuggestions = suggestions.Any();
     }
 
     private async Task ApplySuggestion(SearchSuggestion s)
@@ -767,3 +780,4 @@ else
         public string Sort { get; set; } = "newest";
     }
 }
+

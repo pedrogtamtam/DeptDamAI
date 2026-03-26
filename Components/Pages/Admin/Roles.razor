@@ -1,0 +1,163 @@
+@page "/Admin/Roles"
+@using DeptDam.Data
+@using DeptDam.Models
+@using DeptDam.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize(Roles = "DAM_Admin")]
+@rendermode InteractiveServer
+@inject ApplicationDbContext DbContext
+@inject ITenantService TenantService
+@inject RoleManager<ApplicationRole> RoleManager
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Role Management</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 fw-bold mb-1">Roles</h1>
+        <p class="text-secondary small mb-0">Manage application roles and see user assignments.</p>
+    </div>
+</div>
+
+@if (rolesWithCounts == null)
+{
+    <div class="d-flex justify-content-center p-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        @foreach (var rc in rolesWithCounts)
+        {
+            <div class="col-md-6 col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h5 class="fw-bold mb-0">@rc.Role.Name</h5>
+                            <span class="badge @GetBadgeClass(rc.Role.Name ?? "")">
+                                @rc.UserCount user@(rc.UserCount == 1 ? "" : "s")
+                            </span>
+                        </div>
+                        
+                        <p class="small text-muted mb-4">
+                            @GetRoleDescription(rc.Role.Name ?? "")
+                        </p>
+
+                        <div class="mb-4">
+                            <h6 class="small fw-bold border-bottom pb-2 mb-3">Role Permissions</h6>
+                            <div class="row g-2">
+                                @foreach (var permission in AppPermissions.AllPermissions)
+                                {
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="@($"{rc.Role.Id}_{permission.Replace(".", "_")}")"
+                                                   checked="@rc.Role.Permissions.Contains(permission)"
+                                                   disabled="@(rc.Role.Name == "SuperAdmin")"
+                                                   @onchange="@(async (e) => await TogglePermission(rc.Role, permission, (bool)(e.Value ?? false)))" />
+                                            <label class="form-check-label small" for="@($"{rc.Role.Id}_{permission.Replace(".", "_")}")">
+                                                @permission
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            @if (rc.Role.Name == "SuperAdmin")
+                            {
+                                <p class="small text-muted mt-2 mb-0 italic">SuperAdmin has all permissions by default.</p>
+                            }
+                        </div>
+
+                        <div class="mt-auto pt-3 border-top">
+                            <a href="/Admin/Users" class="btn btn-sm btn-outline-primary w-100">
+                                <i class="bi bi-people me-1"></i> View Users
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<RoleCount>? rolesWithCounts;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var tenantId = TenantService.GetCurrentTenantId()!;
+        
+        // Roles are per-tenant
+        var tenantRoles = await DbContext.Roles
+            .OfType<ApplicationRole>()
+            .Where(r => r.TenantId == tenantId)
+            .OrderBy(r => r.Name)
+            .ToListAsync();
+
+        rolesWithCounts = new List<RoleCount>();
+
+        foreach (var role in tenantRoles)
+        {
+            // Use DbContext to count users in this role for this tenant
+            var count = await DbContext.UserRoles
+                .Where(ur => ur.RoleId == role.Id)
+                .CountAsync();
+            
+            rolesWithCounts.Add(new RoleCount { Role = role, UserCount = count });
+        }
+    }
+
+    private async Task TogglePermission(ApplicationRole role, string permission, bool isChecked)
+    {
+        if (role.Name == "SuperAdmin") return;
+
+        if (isChecked)
+        {
+            if (!role.Permissions.Contains(permission))
+            {
+                role.Permissions.Add(permission);
+            }
+        }
+        else
+        {
+            role.Permissions.Remove(permission);
+        }
+
+        var result = await RoleManager.UpdateAsync(role);
+        if (!result.Succeeded)
+        {
+            // Handle error (could add a message display)
+            Console.WriteLine($"Error updating role: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+        }
+    }
+
+    private string GetBadgeClass(string roleName) => roleName switch
+    {
+        "SuperAdmin" => "bg-danger",
+        "DAM_Admin" => "bg-primary",
+        "DAM_Contributor" => "bg-success",
+        "DAM_Reviewer" => "bg-warning text-dark",
+        "DAM_Viewer" => "bg-info text-dark",
+        _ => "bg-secondary"
+    };
+
+    private string GetRoleDescription(string roleName) => roleName switch
+    {
+        "SuperAdmin" => "Full access to all tenants and system-level configuration.",
+        "DAM_Admin" => "Complete control over the current workspace, including settings and user management.",
+        "DAM_Contributor" => "Can upload, edit, and organize assets within the library.",
+        "DAM_Reviewer" => "Focused on the workflow; can review, approve, or reject assets.",
+        "DAM_Viewer" => "Read-only access to browse, search, and download assets.",
+        _ => "Custom role with specific permissions."
+    };
+
+    private class RoleCount
+    {
+        public ApplicationRole Role { get; set; } = default!;
+        public int UserCount { get; set; }
+    }
+}

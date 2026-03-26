@@ -2,10 +2,11 @@
 @using DeptDam.Models
 @using DeptDam.Services
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "DAM_Admin,SuperAdmin")]
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject IBrandingService BrandingService
 @inject ITenantService TenantService
+@inject IPermissionService PermissionService
 
 <PageTitle>Branding Editor</PageTitle>
 
@@ -32,201 +33,208 @@
 }
 else
 {
-    <div class="row g-4">
+    <PermissionView Permission="@AppPermissions.SettingsManage">
+        <div class="row g-4">
 
-        @* ?? Homepage Hero ???????????????????????????????????????????????????? *@
-        <div class="col-lg-7">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 border-0">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-house-fill text-primary me-2"></i>Homepage Hero</h5>
-                </div>
-                <div class="card-body p-4">
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Badge Text</label>
-                        <input type="text" class="form-control" @bind="settings.HeroBadgeText"
-                               placeholder="WELCOME BACK" maxlength="100" />
-                        <div class="form-text">Small pill above the title (e.g. "WELCOME BACK").</div>
+            @* ?? Homepage Hero ???????????????????????????????????????????????????? *@
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-0">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-house-fill text-primary me-2"></i>Homepage Hero</h5>
                     </div>
+                    <div class="card-body p-4">
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Hero Title</label>
-                        <input type="text" class="form-control" @bind="settings.HeroTitle"
-                               placeholder="Your Creative Workspace" maxlength="200" />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Hero Subtitle</label>
-                        <textarea class="form-control" rows="3" @bind="settings.HeroSubtitle"
-                                  placeholder="Manage, organize…" maxlength="500"></textarea>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-sm-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Primary Button</label>
-                            <input type="text" class="form-control" @bind="settings.PrimaryButtonLabel"
-                                   placeholder="Upload New Asset" maxlength="100" />
-                            <div class="form-text">Links to <code>/Assets/Upload</code></div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Badge Text</label>
+                            <input type="text" class="form-control" @bind="settings.HeroBadgeText"
+                                   placeholder="WELCOME BACK" maxlength="100" />
+                            <div class="form-text">Small pill above the title (e.g. "WELCOME BACK").</div>
                         </div>
-                        <div class="col-sm-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Secondary Button</label>
-                            <input type="text" class="form-control" @bind="settings.SecondaryButtonLabel"
-                                   placeholder="Create Collection" maxlength="100" />
-                            <div class="form-text">Links to <code>/Collections/Create</code></div>
-                        </div>
-                    </div>
 
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Hero Title</label>
+                            <input type="text" class="form-control" @bind="settings.HeroTitle"
+                                   placeholder="Your Creative Workspace" maxlength="200" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Hero Subtitle</label>
+                            <textarea class="form-control" rows="3" @bind="settings.HeroSubtitle"
+                                      placeholder="Manage, organize…" maxlength="500"></textarea>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Primary Button</label>
+                                <input type="text" class="form-control" @bind="settings.PrimaryButtonLabel"
+                                       placeholder="Upload New Asset" maxlength="100" />
+                                <div class="form-text">Links to <code>/Assets/Upload</code></div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">Secondary Button</label>
+                                <input type="text" class="form-control" @bind="settings.SecondaryButtonLabel"
+                                       placeholder="Create Collection" maxlength="100" />
+                                <div class="form-text">Links to <code>/Collections/Create</code></div>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
             </div>
-        </div>
 
-        @* ?? Preview ?????????????????????????????????????????????????????????? *@
-        <div class="col-lg-5">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 border-0">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-eye-fill text-secondary me-2"></i>Live Preview</h5>
-                </div>
-                <div class="card-body p-4">
-                    <div class="bg-white rounded-3 p-4 border shadow-sm">
-                        <span class="badge bg-primary-subtle text-primary mb-2 px-2 py-1 rounded-pill small fw-normal">
-                            @(string.IsNullOrWhiteSpace(settings.HeroBadgeText) ? "WELCOME BACK" : settings.HeroBadgeText)
-                        </span>
-                        <h5 class="fw-bold mb-2">
-                            @(string.IsNullOrWhiteSpace(settings.HeroTitle) ? "Your Creative Workspace" : settings.HeroTitle)
-                        </h5>
-                        <p class="text-secondary small mb-3">
-                            @(string.IsNullOrWhiteSpace(settings.HeroSubtitle) ? "Manage, organize, and distribute…" : settings.HeroSubtitle)
-                        </p>
-                        <div class="d-flex flex-wrap gap-2">
-                            <span class="btn btn-primary btn-sm rounded-pill">
-                                <i class="bi bi-cloud-upload me-1"></i>
-                                @(string.IsNullOrWhiteSpace(settings.PrimaryButtonLabel) ? "Upload New Asset" : settings.PrimaryButtonLabel)
+            @* ?? Preview ?????????????????????????????????????????????????????????? *@
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-0">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-eye-fill text-secondary me-2"></i>Live Preview</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="bg-white rounded-3 p-4 border shadow-sm">
+                            <span class="badge bg-primary-subtle text-primary mb-2 px-2 py-1 rounded-pill small fw-normal">
+                                @(string.IsNullOrWhiteSpace(settings.HeroBadgeText) ? "WELCOME BACK" : settings.HeroBadgeText)
                             </span>
-                            <span class="btn btn-outline-secondary btn-sm rounded-pill">
-                                <i class="bi bi-collection me-1"></i>
-                                @(string.IsNullOrWhiteSpace(settings.SecondaryButtonLabel) ? "Create Collection" : settings.SecondaryButtonLabel)
-                            </span>
+                            <h5 class="fw-bold mb-2">
+                                @(string.IsNullOrWhiteSpace(settings.HeroTitle) ? "Your Creative Workspace" : settings.HeroTitle)
+                            </h5>
+                            <p class="text-secondary small mb-3">
+                                @(string.IsNullOrWhiteSpace(settings.HeroSubtitle) ? "Manage, organize, and distribute…" : settings.HeroSubtitle)
+                            </p>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="btn btn-primary btn-sm rounded-pill">
+                                    <i class="bi bi-cloud-upload me-1"></i>
+                                    @(string.IsNullOrWhiteSpace(settings.PrimaryButtonLabel) ? "Upload New Asset" : settings.PrimaryButtonLabel)
+                                </span>
+                                <span class="btn btn-outline-secondary btn-sm rounded-pill">
+                                    <i class="bi bi-collection me-1"></i>
+                                    @(string.IsNullOrWhiteSpace(settings.SecondaryButtonLabel) ? "Create Collection" : settings.SecondaryButtonLabel)
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        @* ?? Navigation Labels ????????????????????????????????????????????????? *@
-        <div class="col-lg-7">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 border-0">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-layout-sidebar-fill text-warning me-2"></i>Navigation Labels</h5>
-                </div>
-                <div class="card-body p-4">
-                    <p class="text-muted small mb-4">These labels appear in the left sidebar for all users in this workspace.</p>
+            @* ?? Navigation Labels ????????????????????????????????????????????????? *@
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-0">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-layout-sidebar-fill text-warning me-2"></i>Navigation Labels</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-muted small mb-4">These labels appear in the left sidebar for all users in this workspace.</p>
 
-                    <div class="row g-3">
-                        <div class="col-sm-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">
-                                <i class="bi bi-house-door me-1"></i> Home
-                            </label>
-                            <input type="text" class="form-control" @bind="settings.NavHomeLabel"
-                                   placeholder="Home" maxlength="60" />
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">
+                                    <i class="bi bi-house-door me-1"></i> Home
+                                </label>
+                                <input type="text" class="form-control" @bind="settings.NavHomeLabel"
+                                       placeholder="Home" maxlength="60" />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">
+                                    <i class="bi bi-images me-1"></i> Assets
+                                </label>
+                                <input type="text" class="form-control" @bind="settings.NavAssetsLabel"
+                                       placeholder="Assets" maxlength="60" />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">
+                                    <i class="bi bi-collection me-1"></i> Collections
+                                </label>
+                                <input type="text" class="form-control" @bind="settings.NavCollectionsLabel"
+                                       placeholder="Collections" maxlength="60" />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted text-uppercase">
+                                    <i class="bi bi-kanban me-1"></i> Workflow
+                                </label>
+                                <input type="text" class="form-control" @bind="settings.NavWorkflowLabel"
+                                       placeholder="Workflow" maxlength="60" />
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">
-                                <i class="bi bi-images me-1"></i> Assets
-                            </label>
-                            <input type="text" class="form-control" @bind="settings.NavAssetsLabel"
-                                   placeholder="Assets" maxlength="60" />
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">
-                                <i class="bi bi-collection me-1"></i> Collections
-                            </label>
-                            <input type="text" class="form-control" @bind="settings.NavCollectionsLabel"
-                                   placeholder="Collections" maxlength="60" />
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">
-                                <i class="bi bi-kanban me-1"></i> Workflow
-                            </label>
-                            <input type="text" class="form-control" @bind="settings.NavWorkflowLabel"
-                                   placeholder="Workflow" maxlength="60" />
-                        </div>
-                    </div>
 
-                </div>
-            </div>
-        </div>
-
-        @* ?? Page Headings ????????????????????????????????????????????????????? *@
-        <div class="col-lg-5">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 border-0">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-card-heading text-info me-2"></i>Page Headings</h5>
-                </div>
-                <div class="card-body p-4">
-                    <p class="text-muted small mb-4">Main heading shown at the top of each section page.</p>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Assets Page</label>
-                        <input type="text" class="form-control" @bind="settings.PageAssetsHeading"
-                               placeholder="Asset Library" maxlength="200" />
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Assets Subheading</label>
-                        <textarea class="form-control" rows="2" @bind="settings.PageAssetsSubheading"
-                                  placeholder="Browse, search and manage your digital assets." maxlength="500"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Collections Page</label>
-                        <input type="text" class="form-control" @bind="settings.PageCollectionsHeading"
-                               placeholder="Collections" maxlength="200" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Collections Subheading</label>
-                        <textarea class="form-control" rows="2" @bind="settings.PageCollectionsSubheading"
-                                  placeholder="Group and share your assets through static or dynamic collections." maxlength="500"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Workflow Page</label>
-                        <input type="text" class="form-control" @bind="settings.PageWorkflowHeading"
-                               placeholder="Workflow" maxlength="200" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Workflow Subheading</label>
-                        <textarea class="form-control" rows="2" @bind="settings.PageWorkflowSubheading"
-                                  placeholder="Manage asset approvals and lifecycle stages." maxlength="500"></textarea>
-                    </div>
-
                 </div>
             </div>
-        </div>
 
-        @* ?? Actions ?????????????????????????????????????????????????????????? *@
-        <div class="col-12">
-            <div class="d-flex gap-2 align-items-center">
-                <button class="btn btn-primary px-4" @onclick="Save" disabled="@saving">
-                    @if (saving)
+            @* ?? Page Headings ????????????????????????????????????????????????????? *@
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3 border-0">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-card-heading text-info me-2"></i>Page Headings</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-muted small mb-4">Main heading shown at the top of each section page.</p>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Assets Page</label>
+                            <input type="text" class="form-control" @bind="settings.PageAssetsHeading"
+                                   placeholder="Asset Library" maxlength="200" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Assets Subheading</label>
+                            <textarea class="form-control" rows="2" @bind="settings.PageAssetsSubheading"
+                                      placeholder="Browse, search and manage your digital assets." maxlength="500"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Collections Page</label>
+                            <input type="text" class="form-control" @bind="settings.PageCollectionsHeading"
+                                   placeholder="Collections" maxlength="200" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Collections Subheading</label>
+                            <textarea class="form-control" rows="2" @bind="settings.PageCollectionsSubheading"
+                                      placeholder="Group and share your assets through static or dynamic collections." maxlength="500"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Workflow Page</label>
+                            <input type="text" class="form-control" @bind="settings.PageWorkflowHeading"
+                                   placeholder="Workflow" maxlength="200" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Workflow Subheading</label>
+                            <textarea class="form-control" rows="2" @bind="settings.PageWorkflowSubheading"
+                                      placeholder="Manage asset approvals and lifecycle stages." maxlength="500"></textarea>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            @* ?? Actions ?????????????????????????????????????????????????????????? *@
+            <div class="col-12">
+                <div class="d-flex gap-2 align-items-center">
+                    <button class="btn btn-primary px-4" @onclick="Save" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-save me-1"></i>
+                        }
+                        Save Branding
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="ResetToDefaults" disabled="@saving">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Reset to Defaults
+                    </button>
+                    @if (settings.UpdatedAt != default)
                     {
-                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <small class="text-muted ms-2">
+                            Last saved: @settings.UpdatedAt.ToLocalTime().ToString("g")
+                        </small>
                     }
-                    else
-                    {
-                        <i class="bi bi-save me-1"></i>
-                    }
-                    Save Branding
-                </button>
-                <button class="btn btn-outline-secondary" @onclick="ResetToDefaults" disabled="@saving">
-                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset to Defaults
-                </button>
-                @if (settings.UpdatedAt != default)
-                {
-                    <small class="text-muted ms-2">
-                        Last saved: @settings.UpdatedAt.ToLocalTime().ToString("g")
-                    </small>
-                }
+                </div>
             </div>
-        </div>
 
-    </div>
+        </div>
+    </PermissionView>
+    <AuthorizeView>
+        <NotAuthorized>
+            <div class="alert alert-warning">You do not have permission to edit branding settings.</div>
+        </NotAuthorized>
+    </AuthorizeView>
 }
 
 @code {

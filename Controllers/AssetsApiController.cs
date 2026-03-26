@@ -1,5 +1,6 @@
 using DeptDam.Data;
 using DeptDam.Models;
+using DeptDam.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,15 +14,22 @@ namespace DeptDam.Controllers;
 public class AssetsApiController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IPermissionService _permissionService;
 
-    public AssetsApiController(ApplicationDbContext dbContext)
+    public AssetsApiController(ApplicationDbContext dbContext, IPermissionService permissionService)
     {
         _dbContext = dbContext;
+        _permissionService = permissionService;
     }
 
     [HttpGet]
     public async Task<IActionResult> ListAssets([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
+        if (!await _permissionService.HasPermissionAsync(User, AppPermissions.AssetsView))
+        {
+            return Forbid();
+        }
+
         // The tenant context is extracted from the JWT token via the "tenant_id" claim
         var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
         if (string.IsNullOrEmpty(tenantIdClaim))
@@ -58,6 +66,11 @@ public class AssetsApiController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetAsset(string id)
     {
+        if (!await _permissionService.HasPermissionAsync(User, AppPermissions.AssetsView))
+        {
+            return Forbid();
+        }
+
         var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
         if (string.IsNullOrEmpty(tenantIdClaim))
         {
@@ -93,6 +106,11 @@ public class AssetsApiController : ControllerBase
         [FromServices] DeptDam.Services.Storage.IStorageProvider storageProvider, 
         IFormFile file)
     {
+        if (!await _permissionService.HasPermissionAsync(User, AppPermissions.AssetsUpload))
+        {
+            return Forbid();
+        }
+
         var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
         if (string.IsNullOrEmpty(tenantIdClaim))
         {
