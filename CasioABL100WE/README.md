@@ -30,6 +30,19 @@ It is written in Python and uses [`bleak`](https://github.com/hbldh/bleak), a Bl
 
 **Not supported yet:** the inactivity alert. Its register hasn't been documented. You can look for it with `raw read` (see [Advanced](#advanced-raw-registers)).
 
+## Use it from your phone (web version)
+
+[`web/index.html`](web/index.html) is the same tool as a single web page. It uses Web Bluetooth, so it runs in **Chrome on Android** (and in Chrome on Windows, macOS and ChromeOS) with nothing to install:
+
+**https://raw.githack.com/pedrogtamtam/DeptDamAI/claude/abl-100we-bluetooth-tool-vnwwex/CasioABL100WE/web/index.html**
+
+1. Force-stop the CASIO WATCHES app (Settings > Apps > CASIO WATCHES > Force stop), so it doesn't take the connection.
+2. Open the link above in Chrome. Chrome may ask for Bluetooth and Nearby devices permission.
+3. On the watch, in Timekeeping Mode, hold (C) for 3 seconds until `CNCT` flashes.
+4. Tap **Connect watch** and pick the watch. Change settings, then tap **Save to watch**.
+
+Before you connect, the page shows a demo watch, so you can try every control. It doesn't work in Firefox, Samsung Internet or in-app browsers (including the Claude app). Those can't use Bluetooth, so open the link in Chrome.
+
 ## Install
 
 Requires Python 3.10 or newer.
@@ -52,8 +65,9 @@ The watch only accepts a connection for a short time after a button press:
 
 1. **Turn off Bluetooth on your phone**, or close the CASIO WATCHES app. Otherwise the phone takes the connection first.
 2. Run a command, for example `python -m abl100we show`.
-3. While it says `Waiting for the watch...`, **short-press the SEARCH button** on the watch.
-   (A long press starts "find my phone" instead.)
+3. While it says `Waiting for the watch...`, put the watch in Timekeeping Mode and **hold (C) for at least 3 seconds**,
+   until the Bluetooth icon and `CNCT` start to flash.
+4. Don't press any button except (B) (the light) while the tool works: other buttons end the connection.
 
 Repeat step 3 for every command. Each command connects, does its work and disconnects.
 
@@ -179,6 +193,7 @@ abl100we/timezones.py  IANA zone -> UTC offset, DST offset and Casio DST rule co
 abl100we/watch.py      Bluetooth session: request/response matching, step-log transfer
 abl100we/config.py     read the whole configuration, validate and apply changes
 abl100we/cli.py        command-line interface
+web/index.html         the same tool as a phone-friendly web page (Web Bluetooth)
 tests/                 unit tests plus a simulated watch for end-to-end tests
 ```
 
@@ -190,9 +205,9 @@ python -m unittest discover -s . -p "test_*.py"
 
 ## Troubleshooting
 
-* **`watch not found`**: press SEARCH again (briefly), move the watch closer, and make sure your phone's Bluetooth is off.
+* **`watch not found`**: hold (C) for 3 seconds again (in Timekeeping Mode), move the watch closer, and make sure your phone's Bluetooth is off.
 * **`Bluetooth is not available`**: Bluetooth is off. On Linux, run `sudo systemctl start bluetooth`.
-* **`no answer from watch` or `watch disconnected`**: the watch closed its connection window. Run the command again and press SEARCH.
+* **`no answer from watch` or `watch disconnected`**: the watch closed its connection window, or a button other than (B) was pressed. Run the command again and hold (C) for 3 seconds.
 * **The watch rejects a register (`FF 81 xx`)**: this model doesn't have that feature. Experimental features fail this way.
 * To see exactly what is sent and received, add `-v`.
 

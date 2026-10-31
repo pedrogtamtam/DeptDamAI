@@ -25,7 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="abl100we",
         description="Read and change every setting of a Casio ABL-100WE watch over Bluetooth LE.",
-        epilog="Before each command, short-press SEARCH on the watch so it starts advertising.",
+        epilog="Before each command, hold (C) on the watch for 3 seconds (Timekeeping Mode) until CNCT flashes.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-a", "--address", help="watch Bluetooth address (or macOS UUID); skips the name search")
@@ -144,7 +144,7 @@ def config_from_args(args: argparse.Namespace) -> dict:
 # Commands
 # --------------------------------------------------------------------------
 async def cmd_scan(args) -> int:
-    print(f"Scanning for {args.timeout:.0f}s... (short-press SEARCH on the watch)")
+    print(f"Scanning for {args.timeout:.0f}s... (hold (C) on the watch for 3 seconds)")
     found = await scan(args.timeout)
     if not found:
         print("No Casio watch found.")
@@ -155,7 +155,7 @@ async def cmd_scan(args) -> int:
 
 
 async def connect(args) -> WatchSession:
-    print("Waiting for the watch... (short-press SEARCH on the watch)", file=sys.stderr)
+    print("Waiting for the watch... (hold (C) on the watch for 3 seconds until CNCT flashes)", file=sys.stderr)
     session = await WatchSession.connect(args.address, args.name, args.timeout)
     if args.verbose:
         session.on_trace = lambda line: print(f"  [ble] {line}", file=sys.stderr)

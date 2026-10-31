@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- artifact:start -->
+<title>ABL-100WE Settings</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow phone column. Steel watch-case LCD on top, hairline-separated setting groups, sticky save bar. */
+:root {
+  --bg: #e7e9ea;
+  --surface: #f5f6f6;
+  --ink: #1a1e21;
+  --muted: #5a6369;
+  --line: #ccd1d4;
+  --accent: #2348b5;
+  --accent-ink: #ffffff;
+  --ok: #1d7344;
+  --warn: #9a5800;
+  --err: #b0261c;
+  --bezel-a: #f3f4f5;
+  --bezel-b: #9ba2a7;
+  --lcd-bg: #c4caae;
+  --lcd-ink: #1e2317;
+  --lcd-ghost: rgba(30, 35, 23, 0.085);
+  --font-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111416; --surface: #191d20; --ink: #e5e8ea; --muted: #97a0a6; --line: #2b3236;
+    --accent: #86a6ff; --accent-ink: #0d1530; --ok: #5cc98d; --warn: #f0b259; --err: #ff8a7f;
+    --bezel-a: #4a5156; --bezel-b: #23282b;
+    --lcd-bg: #cdbd63; --lcd-ink: #2a240c; --lcd-ghost: rgba(42, 36, 12, 0.1);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111416; --surface: #191d20; --ink: #e5e8ea; --muted: #97a0a6; --line: #2b3236;
+  --accent: #86a6ff; --accent-ink: #0d1530; --ok: #5cc98d; --warn: #f0b259; --err: #ff8a7f;
+  --bezel-a: #4a5156; --bezel-b: #23282b;
+  --lcd-bg: #cdbd63; --lcd-ink: #2a240c; --lcd-ghost: rgba(42, 36, 12, 0.1);
+  color-scheme: dark;
+}
+
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.45 var(--font-ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 560px; margin: 0 auto; padding-block: 20px 120px; display: grid; gap: 28px; }
+h1, h2 { text-wrap: balance; margin: 0; }
+h1 { font-weight: 800; font-stretch: 125%; font-size: 1.55rem; letter-spacing: 0.01em; line-height: 1.1; }
+h2 { font-size: 0.75rem; font-weight: 700; font-stretch: 112%; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+p { margin: 0; }
+a { color: var(--accent); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Header */
+.head { display: grid; gap: 4px; }
+.head p { color: var(--muted); font-size: 0.9rem; }
+
+/* Watch face */
+.case {
+  border-radius: 22px;
+  padding: 14px;
+  background: linear-gradient(160deg, var(--bezel-a), var(--bezel-b));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.15);
+}
+.case-label { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 8px; font-stretch: 125%; font-weight: 800; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--ink); opacity: .78; }
+.case-label small { font-weight: 600; font-size: 0.68rem; letter-spacing: 0.06em; }
+.lcd {
+  background: var(--lcd-bg);
+  color: var(--lcd-ink);
+  border-radius: 8px;
+  padding: 10px 14px 12px;
+  display: grid;
+  gap: 6px;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.18);
+  font-family: var(--font-data);
+}
+.lcd .ind { font-size: 0.66rem; font-weight: 500; letter-spacing: 0.06em; transition: opacity .2s; }
+.lcd .ind.off { opacity: 0.1; }
+.lcd-top { display: flex; align-items: center; gap: 8px; }
+.bar { flex: 1; display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; height: 7px; min-width: 0; }
+.bar i { background: var(--lcd-ink); opacity: .1; border-radius: 1px; }
+.bar i.on { opacity: 1; }
+.lcd-mid { display: flex; justify-content: flex-end; gap: 10px; }
+.lcd-date { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.wk { font-size: 1.35rem; font-weight: 500; letter-spacing: 0.04em; line-height: 1; }
+.lcd-time { display: flex; align-items: flex-end; justify-content: flex-end; gap: 6px; }
+.pm { align-self: flex-start; font-size: 0.8rem; font-weight: 500; }
+.lcd-icons { display: flex; justify-content: flex-end; gap: 10px; }
+svg.seg { display: block; height: auto; }
+svg.seg .on { fill: var(--lcd-ink); }
+svg.seg .off { fill: var(--lcd-ghost); }
+.seg-date { width: min(52%, 170px); }
+.seg-time { width: min(66%, 250px); }
+.seg-sec { width: min(16%, 58px); }
+
+/* Connection */
+.connect { display: grid; gap: 12px; }
+.status { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.status[data-state="connected"] .dot { background: var(--ok); }
+.status[data-state="busy"] .dot { background: var(--warn); }
+.status[data-state="error"] .dot { background: var(--err); }
+.steps-howto { margin: 0; padding-left: 1.2em; color: var(--muted); font-size: 0.9rem; display: grid; gap: 2px; }
+.notice { border: 1px solid var(--line); border-left: 3px solid var(--warn); background: var(--surface); padding: 10px 12px; border-radius: 6px; font-size: 0.9rem; display: grid; gap: 6px; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 9px 16px;
+  font-weight: 600; cursor: pointer; min-height: 42px;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+/* Setting groups */
+.group { display: grid; gap: 6px; }
+.group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; min-height: 52px; }
+.item + .item { border-top: 1px solid var(--line); }
+.item > label, .item > .lbl { min-width: 0; flex: 1 1 auto; display: grid; gap: 1px; }
+.item .hint { color: var(--muted); font-size: 0.8rem; }
+.tag { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warn); }
+.changed > label::after, .changed > .lbl::after { content: "Changed"; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+
+/* Segmented control */
+.seg-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--bg); flex: none; }
+.seg-ctl input { position: absolute; opacity: 0; pointer-events: none; }
+.seg-ctl label { padding: 6px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: var(--font-data); }
+.seg-ctl input:checked + label { background: var(--ink); color: var(--bg); }
+.seg-ctl input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Switch */
+.switch { appearance: none; -webkit-appearance: none; width: 46px; height: 28px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; flex: none; margin: 0; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(18px); }
+
+.field { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 7px 9px; font-family: var(--font-data); font-size: 0.9rem; min-height: 38px; max-width: 100%; }
+input.field[type="number"] { width: 5.2em; text-align: right; }
+select.field { max-width: 46vw; min-width: 0; }
+.inline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.alarm-name { font-weight: 600; font-family: var(--font-data); }
+
+/* Steps */
+.steps-out { padding: 12px 14px; display: grid; gap: 10px; border-top: 1px solid var(--line); }
+.steps-today { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.steps-today strong { font-size: 1.8rem; font-weight: 800; font-stretch: 112%; }
+.history { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.history .col { display: grid; gap: 4px; }
+.history .track { height: 72px; display: flex; align-items: flex-end; }
+.history span.b { display: block; width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+.history span.b.none { background: var(--line); }
+.history small { font-size: 0.66rem; color: var(--muted); text-align: center; font-family: var(--font-data); }
+
+/* Activity log */
+details.log { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+details.log summary { padding: 12px 14px; cursor: pointer; font-weight: 600; }
+.log-body { padding: 0 14px 12px; display: grid; gap: 8px; }
+.log-lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.85rem; }
+.log-lines li[data-k="ok"]::before { content: "✓ "; color: var(--ok); font-weight: 700; }
+.log-lines li[data-k="same"]::before { content: "= "; color: var(--muted); font-weight: 700; }
+.log-lines li[data-k="warn"]::before { content: "! "; color: var(--warn); font-weight: 700; }
+.log-lines li[data-k="err"]::before { content: "✕ "; color: var(--err); font-weight: 700; }
+.log-lines li[data-k="info"]::before { content: "· "; color: var(--muted); font-weight: 700; }
+pre.trace { margin: 0; max-height: 220px; overflow: auto; font: 0.72rem/1.5 var(--font-data); color: var(--muted); white-space: pre; background: var(--bg); border-radius: 6px; padding: 8px; }
+
+/* Save bar */
+.savebar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--line);
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.savebar-in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+.savebar-in p { flex: 1; min-width: 0; font-size: 0.85rem; color: var(--muted); }
+.foot { color: var(--muted); font-size: 0.8rem; display: grid; gap: 4px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<!-- head:end -->
+</head>
+<body>
+<main>
+  <header class="head">
+    <h1>ABL-100WE Settings</h1>
+    <p>Change your Casio watch's settings over Bluetooth, straight from Chrome.</p>
+  </header>
+
+  <section class="case" aria-label="Watch display preview">
+    <div class="case-label"><span>CASIO</span><small id="caseNote">DEMO WATCH</small></div>
+    <div class="lcd" id="lcd">
+      <div class="lcd-top">
+        <span class="ind" id="indPS">PS</span>
+        <div class="bar" id="stepBar" aria-hidden="true"></div>
+        <span class="ind" id="indBT" title="Bluetooth">
+          <svg width="9" height="13" viewBox="0 0 9 13" aria-hidden="true"><path d="M1 3.5l6 5.5-3 2.6V1.4l3 2.6-6 5.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+        </span>
+      </div>
+      <div class="lcd-mid"><span class="ind" id="indMute">MUTE</span><span class="ind" id="indSteps">STEPS</span></div>
+      <div class="lcd-date"><span class="wk" id="lcdWk">SAT</span><span id="lcdDate"></span></div>
+      <div class="lcd-time"><span class="pm ind" id="indPM">P</span><span id="lcdTime"></span><span id="lcdSec"></span></div>
+      <div class="lcd-icons"><span class="ind" id="indDST">DST</span><span class="ind" id="indChime">CHIME</span><span class="ind" id="indAlarm">ALM</span></div>
+    </div>
+  </section>
+
+  <section class="connect" aria-label="Connection">
+    <div class="status" id="status" data-state="demo"><span class="dot"></span><span id="statusText">Showing a demo watch</span></div>
+    <ol class="steps-howto" id="howto">
+      <li>Force-stop the CASIO WATCHES app so it doesn't take the connection.</li>
+      <li>On the watch, in Timekeeping Mode, hold <b>(C)</b> for 3 seconds until <b>CNCT</b> flashes.</li>
+      <li>Tap <b>Connect watch</b> and pick your CASIO watch in the list.</li>
+    </ol>
+    <div class="notice" id="btNotice" hidden></div>
+    <div class="row-btns">
+      <button class="btn primary" id="btnConnect" type="button">Connect watch</button>
+      <button class="btn" id="btnReload" type="button" hidden>Reload from watch</button>
+      <button class="btn" id="btnDisconnect" type="button" hidden>Disconnect</button>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="gDisplay">
+    <div class="group-head"><h2 id="gDisplay">Display and sound</h2></div>
+    <div class="list">
+      <div class="item" data-key="time_format"><span class="lbl">Time format</span>
+        <div class="seg-ctl" role="radiogroup" aria-label="Time format">
+          <input type="radio" name="timeFormat" id="tf12" value="12h"><label for="tf12">12H</label>
+          <input type="radio" name="timeFormat" id="tf24" value="24h"><label for="tf24">24H</label>
+        </div>
+      </div>
+      <div class="item" data-key="date_format"><span class="lbl">Date order <span class="hint">May be ignored by this model</span><span class="tag">Experimental</span></span>
+        <div class="seg-ctl" role="radiogroup" aria-label="Date order">
+          <input type="radio" name="dateFormat" id="dfMD" value="MM-DD"><label for="dfMD">M-DD</label>
+          <input type="radio" name="dateFormat" id="dfDM" value="DD-MM"><label for="dfDM">DD-M</label>
+        </div>
+      </div>
+      <div class="item" data-key="button_tone"><label for="buttonTone">Button tone <span class="hint">Beep on each key press</span></label>
+        <input class="switch" type="checkbox" role="switch" id="buttonTone"></div>
+      <div class="item" data-key="light_duration"><span class="lbl">Backlight</span>
+        <div class="seg-ctl" role="radiogroup" aria-label="Backlight duration">
+          <input type="radio" name="light" id="lightShort" value="short"><label for="lightShort">1.5 s</label>
+          <input type="radio" name="light" id="lightLong" value="long"><label for="lightLong">3 s</label>
+        </div>
+      </div>
+      <div class="item" data-key="power_saving"><label for="powerSaving">Power saving <span class="hint">Blanks the display at night when unused</span></label>
+        <input class="switch" type="checkbox" role="switch" id="powerSaving"></div>
+      <div class="item" data-key="hourly_chime"><label for="hourlyChime">Hourly time signal</label>
+        <input class="switch" type="checkbox" role="switch" id="hourlyChime"></div>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="gAlarms">
+    <div class="group-head"><h2 id="gAlarms">Alarms</h2></div>
+    <div class="list" id="alarmList"></div>
+  </section>
+
+  <section class="group" aria-labelledby="gTimer">
+    <div class="group-head"><h2 id="gTimer">Timer</h2></div>
+    <div class="list">
+      <div class="item" data-key="timer_seconds"><label for="timerMin">Countdown start <span class="hint">Up to 60 minutes</span></label>
+        <div class="inline">
+          <input class="field" type="number" id="timerMin" min="0" max="60" inputmode="numeric" aria-label="Minutes"><span>min</span>
+          <input class="field" type="number" id="timerSec" min="0" max="59" inputmode="numeric" aria-label="Seconds"><span>s</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="gTime">
+    <div class="group-head"><h2 id="gTime">Time and time zones</h2></div>
+    <div class="list">
+      <div class="item"><label for="homeZone">Home time zone <span class="hint" id="homeZoneNow">On watch: …</span></label>
+        <select class="field" id="homeZone"></select></div>
+      <div class="item"><span class="lbl">Set the watch's time <span class="hint">Sends this phone's time and the zone above</span></span>
+        <button class="btn" id="btnSyncTime" type="button">Sync time now</button></div>
+      <div class="item" data-key="auto_time_sync"><label for="autoSync">Automatic time sync <span class="hint">4 times a day with the CASIO WATCHES app</span></label>
+        <input class="switch" type="checkbox" role="switch" id="autoSync"></div>
+      <div class="item" data-key="time_sync_minute"><label for="syncMinute">Sync at minute <span class="hint">Minutes past the hour</span></label>
+        <input class="field" type="number" id="syncMinute" min="0" max="59" inputmode="numeric"></div>
+      <div class="item" data-key="dual_time"><label for="dualZone">Dual time zone <span class="hint" id="dualZoneNow">On watch: …</span><span class="tag">Experimental</span></label>
+        <select class="field" id="dualZone"></select></div>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="gSteps">
+    <div class="group-head"><h2 id="gSteps">Steps</h2></div>
+    <div class="list">
+      <div class="item" data-key="step_goal"><label for="stepGoal">Daily step goal <span class="hint">1,000 to 50,000</span><span class="tag">Experimental</span></label>
+        <input class="field" type="number" id="stepGoal" min="1000" max="50000" step="1000" inputmode="numeric" style="width:6.5em"></div>
+      <div class="item"><span class="lbl">Step log <span class="hint">Today and the previous 7 days</span></span>
+        <button class="btn" id="btnSteps" type="button">Read steps</button></div>
+      <div class="steps-out" id="stepsOut" hidden>
+        <div class="steps-today"><strong id="stepsToday">0</strong><span>steps today</span><span class="hint" id="stepsDist"></span></div>
+        <div class="history" id="stepsHistory" aria-label="Steps on previous days"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="gProfile">
+    <div class="group-head"><h2 id="gProfile">Profile</h2><span class="tag">Experimental</span></div>
+    <div class="list">
+      <div class="item" data-key="height_cm"><label for="pHeight">Height <span class="hint">Used for step distance</span></label>
+        <div class="inline"><input class="field" type="number" id="pHeight" min="50" max="300" inputmode="numeric"><span>cm</span></div></div>
+      <div class="item" data-key="weight_kg"><label for="pWeight">Weight</label>
+        <div class="inline"><input class="field" type="number" id="pWeight" min="10" max="500" inputmode="numeric"><span>kg</span></div></div>
+      <div class="item" data-key="gender"><label for="pGender">Gender</label>
+        <select class="field" id="pGender"><option value="male">Male</option><option value="female">Female</option></select></div>
+      <div class="item" data-key="birthday"><label for="pBirthday">Birthday</label>
+        <input class="field" type="date" id="pBirthday"></div>
+      <div class="item" data-key="wrist"><label for="pWrist">Worn on</label>
+        <select class="field" id="pWrist"><option value="left">Left wrist</option><option value="right">Right wrist</option></select></div>
+    </div>
+  </section>
+
+  <details class="log" id="logBox">
+    <summary>Activity</summary>
+    <div class="log-body">
+      <ul class="log-lines" id="logLines"></ul>
+      <details><summary class="hint">Bluetooth packets</summary><pre class="trace" id="trace"></pre></details>
+    </div>
+  </details>
+
+  <footer class="foot">
+    <p>Settings marked Experimental use the byte layout of other Casio models and may be rejected or ignored by the ABL-100WE.</p>
+    <p>Not affiliated with Casio. Protocol details from the open-source GShockAPI and Gadgetbridge projects.</p>
+  </footer>
+</main>
+
+<div class="savebar">
+  <div class="savebar-in">
+    <p id="saveNote">No changes</p>
+    <button class="btn primary" id="btnSave" type="button" disabled>Save to watch</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+// Page that hosts the Bluetooth-capable copy (claude.ai previews block Bluetooth).
+const HOSTED_URL = "https://raw.githack.com/pedrogtamtam/DeptDamAI/claude/abl-100we-bluetooth-tool-vnwwex/CasioABL100WE/web/index.html";
+
+// ======================================================================
+// Protocol (same byte layouts as the Python tool, abl100we/protocol.py)
+// ======================================================================
+const UUID = {
+  service:  "26eb000d-b012-49a8-b1f8-394fb2032b0f",
+  request:  "26eb002c-b012-49a8-b1f8-394fb2032b0f",  // write w/o response: ask for a register
+  features: "26eb002d-b012-49a8-b1f8-394fb2032b0f",  // notify = register value, write = set register
+  dataReq:  "26eb0023-b012-49a8-b1f8-394fb2032b0f",  // step-log transfer control
+  convoy:   "26eb0024-b012-49a8-b1f8-394fb2032b0f",  // step-log data
+};
+const REG = { TIME: 0x09, BLE: 0x11, BASIC: 0x13, ALM1: 0x15, ALM2: 0x16, TIMER: 0x18, DST_STATE: 0x1D, DST: 0x1E, APP: 0x22, NAME: 0x23, GOAL: 0x43, PROFILE: 0x45 };
+const APP_ID = [0x34, 0x88, 0xF4, 0xE5, 0xD5, 0xAF, 0xC8, 0x29, 0xE0, 0x6D];
+const STEP_START = [0x00, 0x11, 0x00, 0x00, 0x00];
+const STEP_END = [0x04, 0x11, 0x00, 0x00, 0x00];
+const DST_ON = 0x01, DST_AUTO = 0x02;
+
+const hex = (b) => Array.from(b, (x) => x.toString(16).toUpperCase().padStart(2, "0")).join(" ");
+const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const setBit = (v, mask, on) => (on ? v | mask : v & ~mask) & 0xFF;
+function need(raw, reg, len) {
+  if (!raw || raw[0] !== reg) throw new Error(`Expected register ${hex([reg])}, got ${raw ? hex(raw.slice(0, 1)) : "nothing"}`);
+  if (raw.length < len) throw new Error(`Register ${hex([reg])} is too short: ${hex(raw)}`);
+  return Uint8Array.from(raw);
+}
+function range(name, v, lo, hi) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < lo || n > hi) throw new Error(`${name} must be a whole number from ${lo} to ${hi}`);
+  return n;
+}
+const toBcd = (n) => ((Math.floor(n / 10) << 4) | (n % 10)) & 0xFF;
+function fromBcd(b) { const h = b >> 4, l = b & 15; if (h > 9 || l > 9) return null; return h * 10 + l; }
+
+const P = {
+  decodeBasic(raw) {
+    const r = need(raw, REG.BASIC, 3);
+    return {
+      time_format: r[1] & 0x01 ? "24h" : "12h",
+      button_tone: !(r[1] & 0x02),
+      light_duration: r[2] & 0x01 ? "long" : "short",
+      power_saving: !(r[1] & 0x10),
+      date_format: r.length > 4 ? (r[4] & 0x01 ? "DD-MM" : "MM-DD") : null,
+    };
+  },
+  encodeBasic(raw, o) {
+    const r = need(raw, REG.BASIC, 3);
+    if (o.time_format != null) r[1] = setBit(r[1], 0x01, o.time_format === "24h");
+    if (o.button_tone != null) r[1] = setBit(r[1], 0x02, !o.button_tone);
+    if (o.power_saving != null) r[1] = setBit(r[1], 0x10, !o.power_saving);
+    if (o.light_duration != null) r[2] = setBit(r[2], 0x01, o.light_duration === "long");
+    if (o.date_format != null) { if (r.length < 5) throw new Error("This watch has no date format byte"); r[4] = setBit(r[4], 0x01, o.date_format === "DD-MM"); }
+    return r;
+  },
+  decodeAlarms(a1raw, a2raw) {
+    const a1 = need(a1raw, REG.ALM1, 5), a2 = need(a2raw, REG.ALM2, 17);
+    const at = (r, o) => ({ enabled: !!(r[o] & 0x40), hour: r[o + 2], minute: r[o + 3] });
+    return { alarms: [at(a1, 1), at(a2, 1), at(a2, 5), at(a2, 9), at(a2, 13)], chime: !!(a1[1] & 0x80) };
+  },
+  applyAlarm(r, o, a) {
+    if (a.enabled != null) r[o] = setBit(r[o], 0x40, a.enabled);
+    if (a.hour != null) r[o + 2] = range("Alarm hour", a.hour, 0, 23);
+    if (a.minute != null) r[o + 3] = range("Alarm minute", a.minute, 0, 59);
+  },
+  encodeAlarm1(raw, alarm, chime) {
+    const r = need(raw, REG.ALM1, 5);
+    if (alarm) P.applyAlarm(r, 1, alarm);
+    if (chime != null) r[1] = setBit(r[1], 0x80, chime);
+    return r;
+  },
+  encodeAlarms25(raw, updates) {   // updates: {2: {...}, 5: {...}}
+    const r = need(raw, REG.ALM2, 17);
+    for (const [n, a] of Object.entries(updates)) P.applyAlarm(r, 1 + 4 * (Number(n) - 2), a);
+    return r;
+  },
+  decodeTimer(raw) { const r = need(raw, REG.TIMER, 4); return r[1] * 3600 + r[2] * 60 + r[3]; },
+  encodeTimer(raw, secs) {
+    const r = need(raw, REG.TIMER, 4);
+    secs = range("Timer", secs, 1, 3600);
+    r[1] = Math.floor(secs / 3600); r[2] = Math.floor((secs % 3600) / 60); r[3] = secs % 60;
+    return r;
+  },
+  decodeSync(raw) { const r = need(raw, REG.BLE, 14); return { enabled: !(r[12] & 0x80), minute: r[13] }; },
+  encodeSync(raw, enabled, minute) {
+    const r = need(raw, REG.BLE, 14);
+    if (enabled != null) r[12] = setBit(r[12], 0x80, !enabled);
+    if (minute != null) r[13] = range("Sync minute", minute, 0, 59);
+    return r;
+  },
+  encodeTime(c) {
+    return Uint8Array.from([REG.TIME, c.year & 0xFF, c.year >> 8, c.month, c.day, c.hour, c.minute, c.second, c.isoWeekday, Math.floor(c.ms * 256 / 1000), 1]);
+  },
+  decodeDstState(raw) { const r = need(raw, REG.DST_STATE, 5); return [r[3], r[4]]; },
+  encodeDstState(raw, slot, flags) { const r = need(raw, REG.DST_STATE, 5); r[3 + slot] = flags & 0xFF; return r; },
+  decodeZone(raw) {
+    const r = need(raw, REG.DST, 7);
+    const off = r[4] >= 128 ? r[4] - 256 : r[4];
+    return { slot: r[1], utcMinutes: off * 15, dstMinutes: r[5] * 15, rules: r[6] };
+  },
+  encodeZone(raw, z) { const r = need(raw, REG.DST, 7); r[4] = z.offsetQ & 0xFF; r[5] = z.dstQ & 0xFF; r[6] = z.rules & 0xFF; return r; },
+  appNeedsRegistration(raw) { return raw && raw.length >= 12 && raw[0] === REG.APP && raw.slice(1, 11).every((b) => b === 0xFF) && raw[11] === 0; },
+  appInfo() { return Uint8Array.from([REG.APP, ...APP_ID, 0x02]); },
+  decodeName(raw) { return String.fromCharCode(...Array.from(raw.slice(1)).filter((b) => b >= 32 && b < 127)).trim(); },
+  decodeGoal(raw) { const r = need(raw, REG.GOAL, 3); return r[1] | (r[2] << 8); },
+  encodeGoal(raw, steps) { const r = need(raw, REG.GOAL, 3); steps = range("Step goal", steps, 1000, 50000); r[1] = steps & 0xFF; r[2] = steps >> 8; return r; },
+  decodeProfile(raw) {
+    const r = need(raw, REG.PROFILE, 10);
+    const pair = (i) => { const lo = fromBcd(~r[i] & 0xFF), hi = fromBcd(~r[i + 1] & 0xFF); return lo == null || hi == null ? null : lo + hi * 100; };
+    const year = pair(6), m = fromBcd(~r[8] & 0xFF), d = fromBcd(~r[9] & 0xFF);
+    const birthday = year && m && d && m <= 12 && d <= 31 ? `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null;
+    return { gender: r[1] & 1 ? "female" : "male", wrist: r[1] & 2 ? "right" : "left", height_cm: pair(2), weight_kg: pair(4), birthday };
+  },
+  encodeProfile(raw, o) {
+    const r = need(raw, REG.PROFILE, 10);
+    const put = (i, v) => { r[i] = ~toBcd(v % 100) & 0xFF; r[i + 1] = ~toBcd(Math.floor(v / 100)) & 0xFF; };
+    if (o.gender != null) r[1] = setBit(r[1], 0x01, o.gender === "female");
+    if (o.wrist != null) r[1] = setBit(r[1], 0x02, o.wrist === "right");
+    if (o.height_cm != null) put(2, range("Height", o.height_cm, 50, 300));
+    if (o.weight_kg != null) put(4, range("Weight", o.weight_kg, 10, 500));
+    if (o.birthday != null) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(o.birthday);
+      if (!m) throw new Error("Birthday must be a full date");
+      put(6, Number(m[1])); r[8] = ~toBcd(Number(m[2])) & 0xFF; r[9] = ~toBcd(Number(m[3])) & 0xFF;
+    }
+    return r;
+  },
+  parseStepLog(p) {
+    const dv = new DataView(p.buffer, p.byteOffset, p.byteLength);
+    const u32 = (o) => { if (p.length < o + 4) return null; const v = dv.getUint32(o, true); return v >= 0xFFFFFFFE ? null : v; };
+    let timestamp = null;
+    const t = Array.from(p.slice(0, 6), fromBcd);
+    if (t.every((v) => v != null)) timestamp = `20${String(t[0]).padStart(2, "0")}-${String(t[1]).padStart(2, "0")}-${String(t[2]).padStart(2, "0")} ${String(t[3]).padStart(2, "0")}:${String(t[4]).padStart(2, "0")}`;
+    const history = [];
+    for (let i = 0; i < 7 && p.length >= 318 + 8 * i + 8; i++) history.push({ daysAgo: i + 1, steps: u32(318 + 8 * i), distance: u32(322 + 8 * i) });
+    return { timestamp, today: u32(374), distance: u32(378), history };
+  },
+};
+
+// ======================================================================
+// Time zones: IANA name -> what the watch stores (offsets in 15-minute steps)
+// ======================================================================
+const CASIO_DST_RULES = {
+  "America/Anchorage": 0x01, "America/Los_Angeles": 0x01, "America/Denver": 0x01, "America/Chicago": 0x01,
+  "America/New_York": 0x01, "America/Halifax": 0x01, "America/St_Johns": 0x01, "America/Havana": 0x15,
+  "America/Santiago": 0x1B, "America/Asuncion": 0x09, "Atlantic/Azores": 0x02, "Europe/London": 0x02,
+  "Europe/Paris": 0x02, "Europe/Athens": 0x02, "Africa/Casablanca": 0x0F, "Asia/Beirut": 0x0C,
+  "Asia/Jerusalem": 0x2A, "Asia/Tehran": 0x2B, "Australia/Adelaide": 0x04, "Australia/Sydney": 0x04,
+  "Australia/Lord_Howe": 0x12, "Pacific/Norfolk": 0x04, "Pacific/Auckland": 0x05, "Pacific/Chatham": 0x17,
+  "Pacific/Easter": 0x1C,
+};
+const offsetFmt = new Map();
+function tzOffsetMinutes(tz, date) {
+  if (!offsetFmt.has(tz)) offsetFmt.set(tz, new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "longOffset" }));
+  const name = offsetFmt.get(tz).formatToParts(date).find((p) => p.type === "timeZoneName").value;
+  const m = /GMT([+-])(\d{1,2}):?(\d{2})?/.exec(name);
+  return m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] || 0)) : 0;
+}
+const sigCache = new Map();
+function signature(tz, year) {
+  const k = tz + year;
+  if (!sigCache.has(k)) {
+    const start = Date.UTC(year, 0, 1);
+    sigCache.set(k, Array.from({ length: 53 }, (_, i) => tzOffsetMinutes(tz, new Date(start + i * 7 * 86400000))));
+  }
+  return sigCache.get(k);
+}
+function resolveZone(tz, now = new Date()) {
+  const sig = signature(tz, now.getUTCFullYear());
+  const std = Math.min(...sig), dst = Math.max(...sig) - std, cur = tzOffsetMinutes(tz, now);
+  let rules = 0;
+  if (dst) {
+    if (tz in CASIO_DST_RULES) rules = CASIO_DST_RULES[tz];
+    else for (const [cand, code] of Object.entries(CASIO_DST_RULES)) {
+      if (same(signature(cand, now.getUTCFullYear()), sig)) { rules = code; break; }
+    }
+  }
+  const z = { name: tz, offsetQ: Math.round(std / 15), dstQ: Math.round(dst / 15), rules, inDst: cur !== std };
+  z.flags = (z.inDst ? DST_ON : 0) | (z.rules ? DST_AUTO : 0);
+  return z;
+}
+function wallClock(tz, date) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "numeric", second: "numeric", weekday: "short",
+  }).formatToParts(date).map((p) => [p.type, p.value]));
+  return {
+    year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour % 24, minute: +parts.minute,
+    second: +parts.second, isoWeekday: { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }[parts.weekday],
+    weekday: parts.weekday.toUpperCase(), ms: date.getMilliseconds(),
+  };
+}
+const fmtUtc = (min) => `UTC${min < 0 ? "−" : "+"}${String(Math.floor(Math.abs(min) / 60)).padStart(2, "0")}:${String(Math.abs(min) % 60).padStart(2, "0")}`;
+
+// ======================================================================
+// Links: a real watch over Web Bluetooth, or a simulated one
+// ======================================================================
+class Link {
+  constructor() { this.pending = []; this.queue = Promise.resolve(); this.onTrace = () => {}; this.onClose = () => {}; this.step = null; }
+  read(key, opts = {}) {
+    const run = () => this._read(key, opts);
+    const p = this.queue.then(run, run);
+    this.queue = p.catch(() => {});
+    return p;
+  }
+  _read(key, { timeout = 5000, optional = false } = {}) {
+    key = Uint8Array.from(Array.isArray(key) ? key : [key]);
+    return new Promise((resolve, reject) => {
+      const entry = { key };
+      const done = (fn) => (v) => { clearTimeout(timer); this.pending = this.pending.filter((e) => e !== entry); fn(v); };
+      const timer = setTimeout(done(() => optional ? resolve(null) : reject(new Error(`The watch didn't answer (register ${hex(key)}). Hold (C) for 3 seconds to reconnect.`))), timeout);
+      entry.resolve = done(resolve);
+      entry.reject = done((e) => optional ? resolve(null) : reject(e));
+      this.pending.push(entry);
+      this.onTrace(`→ request ${hex(key)}`);
+      this.sendRequest(key).catch(entry.reject);
+    });
+  }
+  async write(bytes) { this.onTrace(`→ write   ${hex(bytes)}`); await this.sendWrite(Uint8Array.from(bytes)); }
+  onFeature(d) {
+    this.onTrace(`← 002d    ${hex(d)}`);
+    if (d[0] === 0xFF && d.length >= 3) {
+      const e = this.pending.find((p) => p.key[0] === d[2]);
+      if (e) e.reject(new Error(`The watch rejected register ${hex([d[2]])}: this model doesn't support it.`));
+      return;
+    }
+    const e = this.pending.find((p) => p.key.every((b, i) => d[i] === b));
+    if (e) e.resolve(d);
+  }
+  async stepLog(timeout = 20000) {
+    const result = new Promise((resolve, reject) => { this.step = { buf: [], expected: null, resolve, reject }; });
+    const timer = setTimeout(() => this.step && this.step.reject(new Error("The step log didn't arrive in time.")), timeout);
+    try {
+      this.onTrace(`→ steps   ${hex(STEP_START)}`);
+      await this.sendStep(Uint8Array.from(STEP_START));
+      return await result;
+    } finally {
+      clearTimeout(timer); this.step = null;
+      try { await this.sendStep(Uint8Array.from(STEP_END)); } catch (e) { /* best effort */ }
+    }
+  }
+  onStepControl(d) {
+    this.onTrace(`← 0023    ${hex(d)}`);
+    if (this.step && d.length >= 5 && d[0] === 0x00 && d[1] === 0x11) { this.step.expected = d[2] | (d[3] << 8) | (d[4] << 16); this.finishStep(); }
+  }
+  onConvoy(d) { if (this.step) { this.step.buf.push(...d); this.finishStep(); } }
+  finishStep() {
+    const s = this.step, n = s && (s.expected || 400);
+    if (s && s.buf.length >= n) s.resolve(Uint8Array.from(s.buf.slice(0, n)));
+  }
+  failAll(err) { for (const e of [...this.pending]) e.reject(err); if (this.step) this.step.reject(err); }
+  async start() {
+    const app = await this.read(REG.APP, { timeout: 3000, optional: true });
+    if (P.appNeedsRegistration(app)) await this.write(P.appInfo());
+    if (!this.name || this.name.toUpperCase() === "CASIO") {
+      const n = await this.read(REG.NAME, { timeout: 3000, optional: true });
+      if (n) this.name = P.decodeName(n);
+    }
+  }
+}
+
+class BleLink extends Link {
+  static async connect() {
+    const device = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "CASIO" }], optionalServices: [UUID.service] });
+    const link = new BleLink();
+    link.device = device; link.name = device.name || "CASIO";
+    device.addEventListener("gattserverdisconnected", () => { link.failAll(new Error("The watch disconnected.")); link.onClose(); });
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(UUID.service);
+    link.req = await svc.getCharacteristic(UUID.request);
+    link.feat = await svc.getCharacteristic(UUID.features);
+    const bytesOf = (ev) => { const v = ev.target.value; return new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength)); };
+    link.feat.addEventListener("characteristicvaluechanged", (ev) => link.onFeature(bytesOf(ev)));
+    await link.feat.startNotifications();
+    try {
+      link.dreq = await svc.getCharacteristic(UUID.dataReq);
+      link.convoy = await svc.getCharacteristic(UUID.convoy);
+      link.dreq.addEventListener("characteristicvaluechanged", (ev) => link.onStepControl(bytesOf(ev)));
+      link.convoy.addEventListener("characteristicvaluechanged", (ev) => link.onConvoy(bytesOf(ev)));
+      await link.dreq.startNotifications();
+      await link.convoy.startNotifications();
+    } catch (e) { link.dreq = null; }
+    await link.start();
+    return link;
+  }
+  sendRequest(key) { return this.req.writeValueWithoutResponse ? this.req.writeValueWithoutResponse(key) : this.req.writeValue(key); }
+  sendWrite(data) { return this.feat.writeValueWithResponse ? this.feat.writeValueWithResponse(data) : this.feat.writeValue(data); }
+  sendStep(data) {
+    if (!this.dreq) return Promise.reject(new Error("This watch doesn't offer the step log."));
+    return this.dreq.writeValueWithResponse ? this.dreq.writeValueWithResponse(data) : this.dreq.writeValue(data);
+  }
+  close() { if (this.device && this.device.gatt.connected) this.device.gatt.disconnect(); }
+}
+
+// A simulated ABL-100WE with plausible example values, used before connecting.
+class DemoLink extends Link {
+  constructor() {
+    super();
+    this.name = "CASIO ABL-100WE";
+    const h = (s) => Uint8Array.from(s.split(" ").map((x) => parseInt(x, 16)));
+    const prof = [0x45, 0x00, ...[0x78, 0x01, 0x72, 0x00, 0x91, 0x19, 0x05, 0x14].map((b) => ~b & 0xFF), 0xFF, 0xFF];
+    this.regs = new Map(Object.entries({
+      "13": h("13 01 00 00 00 00 00 00 00 00 00 00"),
+      "15": h("15 40 40 07 00"),
+      "16": h("16 00 40 06 1E 40 40 0C 1E 00 40 12 00 00 40 16 00"),
+      "18": h("18 00 03 00 00 00 00"),
+      "11": h("11 00 00 00 06 00 00 00 00 00 01 00 00 1E 00"),
+      "1D 00": h("1D 00 01 02 03 0C 01 0C 01 FF FF FF FF FF FF"),
+      "1E 00": h("1E 00 A1 00 00 04 02"),
+      "1E 01": h("1E 01 CA 00 EC 04 01"),
+      "22": h("22 FF FF FF FF FF FF FF FF FF FF 00"),
+      "43": h("43 40 1F 00 00 00 00 00 00 00 00 00"),
+      "45": Uint8Array.from(prof),
+    }));
+  }
+  later(fn) { setTimeout(fn, 60 + Math.random() * 60); }
+  async sendRequest(key) {
+    const v = this.regs.get(hex(key));
+    this.later(() => this.onFeature(v ? Uint8Array.from(v) : Uint8Array.from([0xFF, 0x81, key[0]])));
+  }
+  async sendWrite(d) {
+    await new Promise((r) => setTimeout(r, 40));
+    const k = hex(d.slice(0, d[0] === REG.DST_STATE || d[0] === REG.DST ? 2 : 1));
+    if (this.regs.has(k) && d[0] !== REG.APP) this.regs.set(k, Uint8Array.from(d));
+  }
+  async sendStep(d) {
+    if (d[0] !== 0x00) return;
+    const p = new Uint8Array(400), dv = new DataView(p.buffer);
+    const now = new Date();
+    [now.getFullYear() % 100, now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), 0].forEach((v, i) => { p[i] = toBcd(v); });
+    [8432, 11205, 6120, 9876, 4310, 12650, 7015].forEach((s, i) => { dv.setUint32(318 + 8 * i, s, true); dv.setUint32(322 + 8 * i, Math.round(s * 0.74), true); });
+    dv.setUint32(374, 5280, true); dv.setUint32(378, 3907, true);
+    this.later(() => {
+      this.onStepControl(Uint8Array.from([0x00, 0x11, 0x90, 0x01, 0x00]));
+      for (let i = 0; i < p.length; i += 20) this.onConvoy(p.slice(i, i + 20));
+    });
+  }
+  close() {}
+}
+
+// ======================================================================
+// Reading and applying the whole configuration
+// ======================================================================
+async function readState(link) {
+  const raw = {};
+  const get = async (key, opts) => { const v = await link.read(key, opts); if (v) raw[hex([].concat(key))] = v; return v; };
+  const basic = P.decodeBasic(await get(REG.BASIC));
+  const al = P.decodeAlarms(await get(REG.ALM1), await get(REG.ALM2));
+  const sync = P.decodeSync(await get(REG.BLE));
+  const timer = P.decodeTimer(await get(REG.TIMER));
+  const s = { ...basic, alarms: al.alarms, hourly_chime: al.chime, auto_time_sync: sync.enabled, time_sync_minute: sync.minute, timer_seconds: timer };
+  const goal = await get(REG.GOAL, { timeout: 3000, optional: true });
+  if (goal) try { s.step_goal = P.decodeGoal(goal); } catch (e) { /* ignore */ }
+  const prof = await get(REG.PROFILE, { timeout: 3000, optional: true });
+  if (prof) try { s.profile = P.decodeProfile(prof); } catch (e) { /* ignore */ }
+  const dstRaw = await get([REG.DST_STATE, 0], { optional: true });
+  const flags = dstRaw ? P.decodeDstState(dstRaw) : [null, null];
+  s.zones = [];
+  for (const slot of [0, 1]) {
+    const z = await get([REG.DST, slot], { optional: true });
+    s.zones[slot] = z ? { ...P.decodeZone(z), flags: flags[slot] } : null;
+  }
+  s.raw = raw;
+  return s;
+}
+
+async function update(link, say, label, key, encode, force = false) {
+  const cur = await link.read(key);
+  const next = encode(cur);
+  if (same(next, cur) && !force) { say("same", `${label}: already set`); return; }
+  await link.write(next);
+  const check = await link.read(key, { timeout: 3000, optional: true });
+  if (check && !same(check, next)) say("warn", `${label}: written, but the watch reports ${hex(check)}`);
+  else say("ok", `${label}: ${same(next, cur) ? "confirmed" : "saved"}`);
+}
+
+async function setZone(link, say, slot, tz, force = false) {
+  const z = resolveZone(tz);
+  const label = slot ? "Dual time zone" : "Home time zone";
+  await update(link, say, `${label} summer time flags`, [REG.DST_STATE, 0], (r) => P.encodeDstState(r, slot, z.flags), force);
+  await update(link, say, `${label} (${tz})`, [REG.DST, slot], (r) => P.encodeZone(r, z), force);
+}
+
+async function applyChanges(link, c, say) {
+  const basicKeys = ["time_format", "button_tone", "light_duration", "power_saving", "date_format"].filter((k) => k in c);
+  if (basicKeys.length) await update(link, say, "Display and sound", REG.BASIC, (r) => P.encodeBasic(r, c));
+  const al = c.alarms || [];
+  if (al[0] || "hourly_chime" in c) await update(link, say, al[0] ? "Alarm 1" + ("hourly_chime" in c ? " and time signal" : "") : "Hourly time signal", REG.ALM1, (r) => P.encodeAlarm1(r, al[0], c.hourly_chime));
+  const later = {}; al.forEach((a, i) => { if (a && i) later[i + 1] = a; });
+  if (Object.keys(later).length) await update(link, say, "Alarm " + Object.keys(later).join(", "), REG.ALM2, (r) => P.encodeAlarms25(r, later));
+  if ("timer_seconds" in c) await update(link, say, "Timer", REG.TIMER, (r) => P.encodeTimer(r, c.timer_seconds));
+  if ("auto_time_sync" in c || "time_sync_minute" in c) await update(link, say, "Automatic time sync", REG.BLE, (r) => P.encodeSync(r, c.auto_time_sync, c.time_sync_minute));
+  if ("step_goal" in c) await update(link, say, "Step goal", REG.GOAL, (r) => P.encodeGoal(r, c.step_goal));
+  if (c.profile) await update(link, say, "Profile", REG.PROFILE, (r) => P.encodeProfile(r, c.profile));
+  if (c.dual_time) await setZone(link, say, 1, c.dual_time);
+}
+
+async function syncTime(link, say, tz) {
+  await setZone(link, say, 0, tz, true);
+  const dual = await link.read([REG.DST, 1], { optional: true });
+  if (dual) await link.write(dual);   // same sequence as the official app
+  const c = wallClock(tz, new Date());
+  await link.write(P.encodeTime(c));
+  say("ok", `Time set to ${c.year}-${String(c.month).padStart(2, "0")}-${String(c.day).padStart(2, "0")} ${String(c.hour).padStart(2, "0")}:${String(c.minute).padStart(2, "0")}:${String(c.second).padStart(2, "0")} (${tz})`);
+}
+
+// ======================================================================
+// UI
+// ======================================================================
+const $ = (id) => document.getElementById(id);
+const ui = { link: null, demo: true, state: null, busy: false, steps: null };
+const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+function say(kind, text) {
+  const li = document.createElement("li");
+  li.dataset.k = kind; li.textContent = text;
+  $("logLines").prepend(li);
+  if (kind === "err" || kind === "warn") $("logBox").open = true;
+}
+function trace(line) {
+  const t = $("trace");
+  t.textContent = (`${new Date().toLocaleTimeString()} ${line}\n` + t.textContent).slice(0, 20000);
+}
+function setStatus(state, text) { $("status").dataset.state = state; $("statusText").textContent = text; }
+
+function buildAlarmRows() {
+  const list = $("alarmList");
+  for (let i = 1; i <= 5; i++) {
+    const row = document.createElement("div");
+    row.className = "item"; row.dataset.key = `alarm${i}`;
+    row.innerHTML = `<label for="alarmTime${i}"><span class="alarm-name">AL${i}</span></label>
+      <div class="inline"><input class="field" type="time" id="alarmTime${i}" aria-label="Alarm ${i} time">
+      <input class="switch" type="checkbox" role="switch" id="alarmOn${i}" aria-label="Alarm ${i} on"></div>`;
+    list.append(row);
+  }
+}
+function buildZoneSelects() {
+  let zones = [];
+  try { zones = Intl.supportedValuesOf("timeZone"); } catch (e) { zones = Object.keys(CASIO_DST_RULES); }
+  if (!zones.includes(localZone)) zones.unshift(localZone);
+  const opts = zones.map((z) => `<option value="${z}">${z.replace(/_/g, " ")}</option>`).join("");
+  $("homeZone").innerHTML = opts;
+  $("homeZone").value = localZone;
+  $("dualZone").innerHTML = `<option value="">Keep current</option>` + opts;
+}
+function buildStepBar() { $("stepBar").innerHTML = "<i></i>".repeat(20); }
+
+const pad2 = (n) => String(n).padStart(2, "0");
+function radio(name) { const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : null; }
+function setRadio(name, value) { const el = document.querySelector(`input[name="${name}"][value="${value}"]`); if (el) el.checked = true; }
+
+function fillForm(s) {
+  setRadio("timeFormat", s.time_format);
+  setRadio("dateFormat", s.date_format || "MM-DD");
+  setRadio("light", s.light_duration);
+  $("buttonTone").checked = s.button_tone;
+  $("powerSaving").checked = s.power_saving;
+  $("hourlyChime").checked = s.hourly_chime;
+  s.alarms.forEach((a, i) => { $(`alarmTime${i + 1}`).value = `${pad2(a.hour)}:${pad2(a.minute)}`; $(`alarmOn${i + 1}`).checked = a.enabled; });
+  $("timerMin").value = Math.floor(s.timer_seconds / 60);
+  $("timerSec").value = s.timer_seconds % 60;
+  $("autoSync").checked = s.auto_time_sync;
+  $("syncMinute").value = s.time_sync_minute;
+  $("dualZone").value = "";
+  const zoneText = (z) => z ? `On watch: ${fmtUtc(z.utcMinutes)}${z.dstMinutes ? (z.flags != null && z.flags & DST_AUTO ? ", summer time auto" : ", summer time manual") : ""}` : "On watch: unknown";
+  $("homeZoneNow").textContent = zoneText(s.zones[0]);
+  $("dualZoneNow").textContent = zoneText(s.zones[1]);
+  $("stepGoal").value = s.step_goal ?? "";
+  $("stepGoal").disabled = s.step_goal == null;
+  const p = s.profile || {};
+  $("pHeight").value = p.height_cm ?? ""; $("pWeight").value = p.weight_kg ?? "";
+  $("pGender").value = p.gender || "male"; $("pBirthday").value = p.birthday || ""; $("pWrist").value = p.wrist || "left";
+  for (const id of ["pHeight", "pWeight", "pGender", "pBirthday", "pWrist"]) $(id).disabled = !s.profile;
+  refresh();
+}
+
+// Compare the form with what the watch reported; returns only what changed.
+function collectChanges() {
+  const s = ui.state, c = {}, keys = new Set();
+  if (!s) return { c, keys };
+  const put = (k, v, key = k) => { c[k] = v; keys.add(key); };
+  const tf = radio("timeFormat"); if (tf !== s.time_format) put("time_format", tf);
+  const df = radio("dateFormat"); if (s.date_format && df !== s.date_format) put("date_format", df);
+  const lt = radio("light"); if (lt !== s.light_duration) put("light_duration", lt);
+  if ($("buttonTone").checked !== s.button_tone) put("button_tone", $("buttonTone").checked);
+  if ($("powerSaving").checked !== s.power_saving) put("power_saving", $("powerSaving").checked);
+  if ($("hourlyChime").checked !== s.hourly_chime) put("hourly_chime", $("hourlyChime").checked);
+  const alarms = s.alarms.map((a, i) => {
+    const [h, m] = ($(`alarmTime${i + 1}`).value || `${pad2(a.hour)}:${pad2(a.minute)}`).split(":").map(Number);
+    const on = $(`alarmOn${i + 1}`).checked;
+    if (h === a.hour && m === a.minute && on === a.enabled) return null;
+    keys.add(`alarm${i + 1}`);
+    return { enabled: on, hour: h, minute: m };
+  });
+  if (alarms.some(Boolean)) c.alarms = alarms;
+  const secs = (Number($("timerMin").value) || 0) * 60 + (Number($("timerSec").value) || 0);
+  if (secs !== s.timer_seconds) put("timer_seconds", secs);
+  if ($("autoSync").checked !== s.auto_time_sync) put("auto_time_sync", $("autoSync").checked);
+  const sm = Number($("syncMinute").value); if ($("syncMinute").value !== "" && sm !== s.time_sync_minute) put("time_sync_minute", sm);
+  if ($("dualZone").value) put("dual_time", $("dualZone").value);
+  if (s.step_goal != null && $("stepGoal").value !== "" && Number($("stepGoal").value) !== s.step_goal) put("step_goal", Number($("stepGoal").value));
+  if (s.profile) {
+    const p = {}, sp = s.profile;
+    const num = (id) => $(id).value === "" ? null : Number($(id).value);
+    if (num("pHeight") != null && num("pHeight") !== sp.height_cm) { p.height_cm = num("pHeight"); keys.add("height_cm"); }
+    if (num("pWeight") != null && num("pWeight") !== sp.weight_kg) { p.weight_kg = num("pWeight"); keys.add("weight_kg"); }
+    if ($("pGender").value !== sp.gender) { p.gender = $("pGender").value; keys.add("gender"); }
+    if ($("pBirthday").value && $("pBirthday").value !== sp.birthday) { p.birthday = $("pBirthday").value; keys.add("birthday"); }
+    if ($("pWrist").value !== sp.wrist) { p.wrist = $("pWrist").value; keys.add("wrist"); }
+    if (Object.keys(p).length) c.profile = p;
+  }
+  return { c, keys };
+}
+
+function refresh() {
+  const { keys } = collectChanges();
+  document.querySelectorAll(".item[data-key]").forEach((el) => el.classList.toggle("changed", keys.has(el.dataset.key)));
+  const n = keys.size, target = ui.demo ? "demo watch" : "watch";
+  $("saveNote").textContent = n ? `${n} change${n > 1 ? "s" : ""} not saved yet` : ui.demo ? "Demo values. Connect to load your watch" : "Everything matches the watch";
+  $("btnSave").textContent = `Save to ${target}`;
+  $("btnSave").disabled = ui.busy || !n || !ui.link;
+  for (const id of ["btnSyncTime", "btnSteps", "btnReload"]) $(id).disabled = ui.busy || !ui.link;
+  $("btnConnect").disabled = ui.busy;
+  renderLcd();
+}
+
+// ---- LCD preview ----------------------------------------------------
+const SEG = { a: [2, 0, 8, 2], b: [10, 2, 2, 7], c: [10, 11, 2, 7], d: [2, 18, 8, 2], e: [0, 11, 2, 7], f: [0, 2, 2, 7], g: [2, 9, 8, 2] };
+const GLYPH = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+function sevenSeg(text, cls) {
+  let x = 0; const out = [];
+  for (const ch of text) {
+    if (ch === ":") { out.push(`<rect class="on" x="${x + 1}" y="5" width="2.2" height="2.2"/><rect class="on" x="${x}" y="13" width="2.2" height="2.2"/>`); x += 6; continue; }
+    if (ch === "·") { out.push(`<rect class="on" x="${x}" y="17.8" width="2.2" height="2.2"/>`); x += 5; continue; }
+    const lit = GLYPH[ch] ?? "";
+    for (const [n, [sx, sy, w, h]] of Object.entries(SEG)) out.push(`<rect class="${lit.includes(n) ? "on" : "off"}" x="${x + sx}" y="${sy}" width="${w}" height="${h}" rx="0.7"/>`);
+    x += 15;
+  }
+  return `<svg class="seg ${cls}" viewBox="-3 -0.5 ${x + 1} 21" aria-hidden="true"><g transform="skewX(-7)">${out.join("")}</g></svg>`;
+}
+function renderLcd() {
+  const tz = $("homeZone").value || localZone;
+  const c = wallClock(tz, new Date());
+  const h24 = radio("timeFormat") !== "12h";
+  const hour = h24 ? c.hour : (c.hour % 12 || 12);
+  const dayFirst = radio("dateFormat") === "DD-MM";
+  $("lcdWk").textContent = c.weekday;
+  $("lcdDate").innerHTML = sevenSeg(`${pad2(c.year % 100)}·${dayFirst ? pad2(c.day) + "-" + String(c.month).padStart(2, " ") : String(c.month).padStart(2, " ") + "-" + pad2(c.day)}`, "seg-date");
+  $("lcdTime").innerHTML = sevenSeg(`${String(hour).padStart(2, " ")}:${pad2(c.minute)}`, "seg-time");
+  $("lcdSec").innerHTML = sevenSeg(pad2(c.second), "seg-sec");
+  const on = (id, v) => $(id).classList.toggle("off", !v);
+  on("indPM", !h24 && c.hour >= 12);
+  on("indPS", $("powerSaving").checked);
+  on("indMute", !$("buttonTone").checked);
+  on("indChime", $("hourlyChime").checked);
+  on("indAlarm", [1, 2, 3, 4, 5].some((i) => $(`alarmOn${i}`).checked));
+  on("indBT", ui.link && !ui.demo);
+  on("indDST", resolveZone(tz).inDst);
+  on("indSteps", !!ui.steps);
+  const goal = Number($("stepGoal").value) || 0;
+  const filled = ui.steps && goal ? Math.min(20, Math.floor((ui.steps.today || 0) / goal * 20)) : 0;
+  $("stepBar").querySelectorAll("i").forEach((el, i) => el.classList.toggle("on", i < filled));
+}
+
+// ---- Actions ----------------------------------------------------------
+async function run(label, fn) {
+  if (ui.busy) return;
+  ui.busy = true; refresh();
+  const prev = { state: $("status").dataset.state, text: $("statusText").textContent };
+  setStatus("busy", label);
+  try { await fn(); if ($("status").dataset.state === "busy") setStatus(prev.state, prev.text); }
+  catch (e) { say("err", e.message || String(e)); setStatus("error", e.message || String(e)); }
+  finally { ui.busy = false; refresh(); }
+}
+
+async function loadFrom(link, demo) {
+  ui.link = link; ui.demo = demo;
+  link.onTrace = trace;
+  ui.state = await readState(link);
+  fillForm(ui.state);
+}
+
+function bluetoothProblem() {
+  if (!("bluetooth" in navigator)) return "unsupported";
+  const pol = document.permissionsPolicy || document.featurePolicy;
+  try { if (pol && pol.allowsFeature && !pol.allowsFeature("bluetooth")) return "blocked"; } catch (e) { /* ignore */ }
+  return null;
+}
+function showBtNotice(kind) {
+  const n = $("btNotice");
+  const onHosted = location.href.startsWith(HOSTED_URL.split("/claude/")[0]);
+  const link = onHosted ? "" : `<a href="${HOSTED_URL}" target="_blank" rel="noopener">Open the Bluetooth version in Chrome</a>`;
+  n.innerHTML = kind === "blocked"
+    ? `<b>Bluetooth is blocked in this preview.</b><span>The page can talk to your watch only when it is opened directly in Chrome.</span>${link}`
+    : `<b>This browser can't use Bluetooth.</b><span>Use Chrome on Android, Windows, macOS or ChromeOS. In the Claude app, open the link in Chrome instead.</span>${link}`;
+  n.hidden = false;
+}
+
+$("btnConnect").addEventListener("click", () => {
+  const problem = bluetoothProblem();
+  if (problem) { showBtNotice(problem); return; }
+  run("Connecting… hold (C) on the watch for 3 seconds", async () => {
+    let link;
+    try { link = await BleLink.connect(); }
+    catch (e) {
+      if (e.name === "NotFoundError") { setStatus(ui.demo ? "demo" : "error", "No watch selected"); return; }
+      if (e.name === "SecurityError") { showBtNotice("blocked"); throw new Error("Bluetooth is blocked here."); }
+      throw e;
+    }
+    link.onClose = () => { if (ui.link === link) { ui.link = null; setStatus("error", "The watch disconnected. Hold (C) for 3 seconds and connect again."); $("btnDisconnect").hidden = true; refresh(); } };
+    if (ui.link) ui.link.close();
+    await loadFrom(link, false);
+    $("caseNote").textContent = link.name.replace(/^CASIO\s*/i, "") || "ABL-100WE";
+    $("btnDisconnect").hidden = false; $("btnReload").hidden = false;
+    say("info", `Connected to ${link.name}`);
+    setStatus("connected", `Connected to ${link.name}`);
+  });
+});
+$("btnDisconnect").addEventListener("click", () => {
+  if (ui.link) ui.link.close();
+  ui.link = null; $("btnDisconnect").hidden = true;
+  setStatus("demo", "Disconnected"); refresh();
+});
+$("btnReload").addEventListener("click", () => run("Reading settings…", async () => { ui.state = await readState(ui.link); fillForm(ui.state); say("info", "Settings reloaded from the watch"); }));
+$("btnSave").addEventListener("click", () => run("Saving…", async () => {
+  const { c } = collectChanges();
+  await applyChanges(ui.link, c, say);
+  ui.state = await readState(ui.link);
+  fillForm(ui.state);
+  if (c.dual_time) say("info", `Dual time set to ${c.dual_time}`);
+}));
+$("btnSyncTime").addEventListener("click", () => run("Setting the time…", async () => {
+  await syncTime(ui.link, say, $("homeZone").value);
+  ui.state = await readState(ui.link); fillForm(ui.state);
+}));
+$("btnSteps").addEventListener("click", () => run("Reading the step log…", async () => {
+  const log = P.parseStepLog(await ui.link.stepLog());
+  ui.steps = log;
+  $("stepsToday").textContent = log.today == null ? "–" : log.today.toLocaleString();
+  $("stepsDist").textContent = log.distance == null ? "" : `${(log.distance / 1000).toFixed(2)} km${log.timestamp ? ` · recorded ${log.timestamp}` : ""}`;
+  const max = Math.max(1, ...log.history.map((d) => d.steps || 0), Number($("stepGoal").value) || 0);
+  $("stepsHistory").innerHTML = log.history.slice().reverse().map((d) => {
+    const pct = d.steps ? Math.max(2, Math.round(d.steps / max * 100)) : 2;
+    return `<div class="col" title="${d.steps == null ? "No data" : d.steps.toLocaleString() + " steps"}"><div class="track"><span class="b${d.steps ? "" : " none"}" style="height:${pct}%"></span></div><small>−${d.daysAgo}d</small></div>`;
+  }).join("");
+  $("stepsOut").hidden = false;
+  say("ok", `Step log read: ${log.today ?? 0} steps today`);
+}));
+document.addEventListener("input", refresh);
+document.addEventListener("change", refresh);
+
+// ---- Start with the demo watch so the page shows real controls at rest
+buildAlarmRows(); buildZoneSelects(); buildStepBar();
+const demo = new DemoLink();
+loadFrom(demo, true).then(() => { setStatus("demo", "Showing a demo watch: changes stay on this page"); refresh(); });
+setInterval(renderLcd, 1000);
+const problem = bluetoothProblem();
+if (problem) showBtNotice(problem);
+</script>
+<!-- artifact:end -->
+</body>
+</html>

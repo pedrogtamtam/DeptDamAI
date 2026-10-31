@@ -58,7 +58,7 @@ async def find_device(address: str | None, name_filter: str, timeout: float):
         raise _no_bluetooth(exc) from exc
     if device is None:
         raise WatchError(
-            "watch not found. Short-press the SEARCH button on the watch so it starts advertising, "
+            "watch not found. In Timekeeping Mode, hold (C) on the watch for 3 seconds until CNCT flashes, "
             "keep it close to this computer, and turn off Bluetooth on your phone so the "
             "CASIO WATCHES app does not grab the connection first."
         )
