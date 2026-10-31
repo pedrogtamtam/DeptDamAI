@@ -17,6 +17,12 @@
     <Compile Remove="AzureFunctions\**\*.cs" />
   </ItemGroup>
 
+  <!-- Standalone Python tool for the Casio ABL-100WE watch; not part of the web app -->
+  <ItemGroup>
+    <Content Remove="CasioABL100WE\**" />
+    <None Remove="CasioABL100WE\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="AzureFunctions\DeptDam.Functions.csproj" />
   </ItemGroup>

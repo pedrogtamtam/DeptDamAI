@@ -1,0 +1,26 @@
+{
+  "time_format": "24h",
+  "button_tone": false,
+  "light_duration": "long",
+  "power_saving": true,
+  "hourly_chime": false,
+
+  "auto_time_sync": true,
+  "time_sync_minute": 30,
+
+  "alarms": [
+    { "enabled": true,  "time": "07:00" },
+    { "enabled": false, "time": "08:30" },
+    null,
+    null,
+    { "enabled": true,  "hour": 22, "minute": 15 }
+  ],
+
+  "timer_seconds": "05:00",
+
+  "step_goal": 8000,
+  "user_profile": { "height_cm": 178, "weight_kg": 75, "gender": "male", "birthday": "1990-05-17", "wrist": "left" },
+
+  "dual_time": { "timezone": "America/New_York" },
+  "sync_time": { "timezone": "Europe/Lisbon" }
+}
