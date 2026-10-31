@@ -15,7 +15,7 @@ from . import protocol as p
 from .timezones import local_zone_name, resolve
 from .watch import WatchSession
 
-BASIC_KEYS = ("time_format", "button_tone", "light_duration", "power_saving")
+BASIC_KEYS = ("time_format", "button_tone", "light_duration", "power_saving", "date_format")
 SETTING_KEYS = BASIC_KEYS + (
     "hourly_chime", "auto_time_sync", "time_sync_minute", "alarms", "timer_seconds",
     "step_goal", "user_profile",
@@ -109,6 +109,8 @@ def validate_config(cfg: dict) -> dict:
         out["time_format"] = str(cfg["time_format"]).lower()
     if cfg.get("light_duration") is not None:
         out["light_duration"] = p.normalize_light(cfg["light_duration"])
+    if cfg.get("date_format") is not None:
+        out["date_format"] = p.normalize_date_format(cfg["date_format"])
     if cfg.get("time_sync_minute") is not None:
         out["time_sync_minute"] = cfg["time_sync_minute"]
     if cfg.get("timer_seconds") is not None:
@@ -231,6 +233,7 @@ def format_state(state: dict) -> str:
         f"Time format      {state['time_format']}",
         f"Button tone      {onoff(state['button_tone'])}",
         f"Light duration   {state['light_duration']} ({p.LIGHT_SECONDS[state['light_duration']]})",
+        f"Date format      {state.get('date_format') or '?'}  (experimental)",
         f"Power saving     {onoff(state['power_saving'])}",
         f"Hourly chime     {onoff(state['hourly_chime'])}",
         f"Auto time sync   {onoff(state['auto_time_sync'])} (minute :{state['time_sync_minute']:02d})",

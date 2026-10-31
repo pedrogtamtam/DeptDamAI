@@ -128,6 +128,9 @@ _MASK_24H = 0x01
 _MASK_TONE_OFF = 0x02
 _MASK_POWER_SAVING_OFF = 0x10
 _MASK_LIGHT_LONG = 0x01
+_DATE_IDX, _MASK_DAY_FIRST = 4, 0x01   # date order; other Casio modules use it, unconfirmed on ABL-100WE
+
+DATE_MONTH_FIRST, DATE_DAY_FIRST = "MM-DD", "DD-MM"
 
 
 @dataclass
@@ -136,6 +139,7 @@ class BasicSettings:
     button_tone: bool
     light_duration: str     # "short" | "long"
     power_saving: bool
+    date_format: str | None = None   # "MM-DD" | "DD-MM" (experimental)
 
 
 def decode_basic(raw: bytes) -> BasicSettings:
@@ -145,6 +149,8 @@ def decode_basic(raw: bytes) -> BasicSettings:
         button_tone=not r[1] & _MASK_TONE_OFF,
         light_duration=LIGHT_LONG if r[2] & _MASK_LIGHT_LONG else LIGHT_SHORT,
         power_saving=not r[1] & _MASK_POWER_SAVING_OFF,
+        date_format=(DATE_DAY_FIRST if r[_DATE_IDX] & _MASK_DAY_FIRST else DATE_MONTH_FIRST)
+        if len(r) > _DATE_IDX else None,
     )
 
 
@@ -155,6 +161,7 @@ def encode_basic(
     button_tone: bool | None = None,
     light_duration: str | None = None,
     power_saving: bool | None = None,
+    date_format: str | None = None,
 ) -> bytes:
     r = _require(raw, Reg.SETTING_FOR_BASIC, 3)
     if time_format is not None:
@@ -168,7 +175,21 @@ def encode_basic(
     if light_duration is not None:
         light_duration = normalize_light(light_duration)
         r[2] = _set_bit(r[2], _MASK_LIGHT_LONG, light_duration == LIGHT_LONG)
+    if date_format is not None:
+        date_format = normalize_date_format(date_format)
+        if len(r) <= _DATE_IDX:
+            raise ProtocolError(f"register 0x13 too short for the date format byte: {hexstr(r)}")
+        r[_DATE_IDX] = _set_bit(r[_DATE_IDX], _MASK_DAY_FIRST, date_format == DATE_DAY_FIRST)
     return bytes(r)
+
+
+def normalize_date_format(value: str) -> str:
+    v = str(value).strip().upper().replace(":", "-").replace(".", "-").replace("/", "-").replace(" ", "")
+    if v in ("MM-DD", "M-DD", "M-D", "MONTH-DAY", "MONTHFIRST"):
+        return DATE_MONTH_FIRST
+    if v in ("DD-MM", "DD-M", "D-M", "DAY-MONTH", "DAYFIRST"):
+        return DATE_DAY_FIRST
+    raise ValueError("date_format must be 'MM-DD' (month first) or 'DD-MM' (day first)")
 
 
 def normalize_light(value: str) -> str:

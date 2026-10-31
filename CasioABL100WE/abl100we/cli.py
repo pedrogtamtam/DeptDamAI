@@ -41,6 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("set", help="change one or more settings")
     s.add_argument("--time-format", choices=("12h", "24h"))
+    s.add_argument("--date-format", choices=(p.DATE_MONTH_FIRST, p.DATE_DAY_FIRST),
+                   help="date order on the display (experimental, see README)")
     s.add_argument("--button-tone", choices=ON_OFF, help="key beep")
     s.add_argument("--light", choices=(p.LIGHT_SHORT, p.LIGHT_LONG), help="backlight duration: short=1.5s, long=3s")
     s.add_argument("--power-saving", choices=ON_OFF)
@@ -98,6 +100,7 @@ def config_from_args(args: argparse.Namespace) -> dict:
     if args.command == "set":
         mapping = {
             "time_format": args.time_format,
+            "date_format": args.date_format,
             "button_tone": args.button_tone,
             "light_duration": args.light,
             "power_saving": args.power_saving,

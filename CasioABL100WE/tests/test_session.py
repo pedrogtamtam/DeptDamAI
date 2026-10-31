@@ -101,6 +101,7 @@ class SessionTest(unittest.TestCase):
 
         state = run(go())
         self.assertEqual(state["time_format"], "24h")
+        self.assertEqual(state["date_format"], "MM-DD")
         self.assertEqual(state["power_saving"], True)
         self.assertEqual(state["alarms"][0], {"enabled": True, "hour": 7, "minute": 0})
         self.assertEqual(state["alarms"][2], {"enabled": False, "hour": 8, "minute": 30})
@@ -128,6 +129,7 @@ class SessionTest(unittest.TestCase):
     def test_apply_changes_every_setting(self):
         cfg = validate_config({
             "time_format": "12h", "button_tone": False, "light_duration": "long", "power_saving": False,
+            "date_format": "DD-MM",
             "hourly_chime": True, "auto_time_sync": "on", "time_sync_minute": 5,
             "alarms": [{"enabled": False}, None, {"time": "06:15", "enabled": True}, None, {"hour": 23, "minute": 59}],
             "timer_seconds": "10:00", "step_goal": 8000,
@@ -145,6 +147,8 @@ class SessionTest(unittest.TestCase):
         self.assertEqual(fake.registers[h("13")][1], 0x20 | 0x02 | 0x10)      # 12h, tone off, PS off; unknown bit 0x20 kept
         self.assertEqual((state["time_format"], state["button_tone"], state["power_saving"]), ("12h", False, False))
         self.assertEqual(state["light_duration"], "long")
+        self.assertEqual(state["date_format"], "DD-MM")
+        self.assertEqual(fake.registers[h("13")][4], 0x01)
         self.assertTrue(state["hourly_chime"])
         self.assertEqual(state["alarms"][0], {"enabled": False, "hour": 7, "minute": 0})
         self.assertEqual(state["alarms"][2], {"enabled": True, "hour": 6, "minute": 15})
@@ -223,9 +227,10 @@ class ValidationAndCliTest(unittest.TestCase):
         self.assertEqual(cfg["alarms"], [None, None, {"enabled": True, "hour": 6, "minute": 30}])
 
     def test_cli_set(self):
-        args = build_parser().parse_args(["set", "--time-format", "24h", "--timer", "5:00", "--hourly-chime", "off"])
+        args = build_parser().parse_args(["set", "--time-format", "24h", "--timer", "5:00", "--hourly-chime", "off",
+                                          "--date-format", "DD-MM"])
         cfg = validate_config(config_from_args(args))
-        self.assertEqual(cfg, {"time_format": "24h", "hourly_chime": False, "timer_seconds": 300})
+        self.assertEqual(cfg, {"time_format": "24h", "date_format": "DD-MM", "hourly_chime": False, "timer_seconds": 300})
 
 
 if __name__ == "__main__":

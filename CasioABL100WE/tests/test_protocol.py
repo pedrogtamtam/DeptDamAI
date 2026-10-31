@@ -30,6 +30,18 @@ class BasicSettingsTest(unittest.TestCase):
         s = p.decode_basic(new)
         self.assertEqual((s.time_format, s.button_tone, s.power_saving, s.light_duration), ("12h", True, False, "short"))
 
+    def test_date_format(self):
+        raw = bytes([0x13, 0, 0, 0, 0x40]) + bytes(7)              # 0x40 = unknown bit in byte 4
+        self.assertEqual(p.decode_basic(raw).date_format, "MM-DD")
+        new = p.encode_basic(raw, date_format="dd/mm")
+        self.assertEqual(new[4], 0x41)
+        self.assertEqual(new[:4] + new[5:], raw[:4] + raw[5:])
+        self.assertEqual(p.decode_basic(new).date_format, "DD-MM")
+        self.assertEqual(p.encode_basic(new, date_format="MM-DD"), raw)
+        self.assertIsNone(p.decode_basic(bytes([0x13, 0, 0])).date_format)   # short register
+        with self.assertRaises(ValueError):
+            p.encode_basic(raw, date_format="YYYY")
+
     def test_rejects_wrong_register(self):
         with self.assertRaises(p.ProtocolError):
             p.decode_basic(bytes([0x15, 0, 0]))

@@ -11,6 +11,7 @@ It is written in Python and uses [`bleak`](https://github.com/hbldh/bleak), a Bl
 | Setting | Command | Status |
 |---|---|---|
 | 12/24-hour format | `set --time-format 12h\|24h` | supported |
+| Date order (month-day / day-month) | `set --date-format MM-DD\|DD-MM` | experimental, [see below](#date-display-format) |
 | Button tone (key beep) | `set --button-tone on\|off` | supported |
 | Backlight duration (1.5 s / 3 s) | `set --light short\|long` | supported |
 | Power saving | `set --power-saving on\|off` | supported |
@@ -93,6 +94,24 @@ Global options go **before** the command:
 | `-t, --timeout SEC` | how long to wait for the watch (default 30) |
 | `-v, --verbose` | print every Bluetooth packet |
 
+## Date display format
+
+The watch shows the date as year · month-day, for example `24· 6-30` for 30 June 2024.
+The ABL-100WE's **own setup menu has no option to change this**. Its manual (Operation Guide 3565) lists every on-watch setting, and date order isn't one of them. Some other Casio watches have this option in their menus (`M.DD` / `DD.M`).
+
+Over Bluetooth, other Casio watches store the date order as one bit in the basic-settings register (`13`, byte 4, bit `0x01`: set = day first). The ABL-100WE has that byte too, so this tool can write the bit. Nobody has confirmed yet whether this firmware uses it for the display, so test it:
+
+```bash
+python -m abl100we set --date-format DD-MM    # day first
+# Look at the watch: does "6-30" now read "30-6"?
+python -m abl100we set --date-format MM-DD    # back to the default (month first)
+```
+
+* **If the display changes**, the setting works. Keep it, or put `"date_format": "DD-MM"` in your JSON config.
+* **If the display doesn't change** (even after pressing (C) to leave and re-enter the time screen), this firmware ignores the bit. The date order is then fixed. Set it back with `--date-format MM-DD` to keep the register at its factory value.
+
+`show` reports what is stored in the register, which may not be what the display uses.
+
 ## Change everything at once (backup / restore)
 
 ```bash
@@ -107,6 +126,7 @@ python -m abl100we apply my-watch.json             # write it to the watch
 | Key | Values |
 |---|---|
 | `time_format` | `"12h"` / `"24h"` |
+| `date_format` | `"MM-DD"` / `"DD-MM"` (experimental) |
 | `button_tone`, `power_saving`, `hourly_chime`, `auto_time_sync` | `true` / `false` |
 | `light_duration` | `"short"` (1.5 s) / `"long"` (3 s) |
 | `time_sync_minute` | 0–59 |
@@ -133,7 +153,7 @@ Register map used by this tool:
 |---|---|
 | `09` | current time (write only) |
 | `11` | Bluetooth settings: byte 12 bit `0x80` = auto sync **off**, byte 13 = sync minute |
-| `13` | byte 1: `0x01` 24h, `0x02` tone off, `0x10` power saving off; byte 2: `0x01` long light |
+| `13` | byte 1: `0x01` 24h, `0x02` tone off, `0x10` power saving off; byte 2: `0x01` long light; byte 4: `0x01` day-first date (experimental) |
 | `15` | alarm 1 (`flags, 0x40, hour, minute`); flag `0x40` = on, `0x80` = hourly chime |
 | `16` | alarms 2–5, same 4-byte layout |
 | `18` | timer: hours, minutes, seconds |
