@@ -182,6 +182,23 @@ details.log summary { padding: 12px 14px; cursor: pointer; font-weight: 600; }
 .log-lines li[data-k="info"]::before { content: "· "; color: var(--muted); font-weight: 700; }
 pre.trace { margin: 0; max-height: 220px; overflow: auto; font: 0.72rem/1.5 var(--font-data); color: var(--muted); white-space: pre; background: var(--bg); border-radius: 6px; padding: 8px; }
 
+/* Register lab */
+details.lab { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+details.lab > summary { padding: 12px 14px; cursor: pointer; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.lab-body { padding: 0 14px 14px; display: grid; gap: 12px; font-size: 0.9rem; }
+.lab-body ol { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; color: var(--muted); }
+.mono { font-family: var(--font-data); font-size: 0.8rem; overflow-wrap: anywhere; }
+.meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.lab-row { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
+.lab-row .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stepper output { min-width: 4.5em; text-align: center; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.btn.small { min-height: 36px; padding: 6px 12px; font-size: 0.85rem; }
+.verdict { border-left: 3px solid var(--accent); padding: 6px 10px; background: var(--bg); border-radius: 4px; }
+.raw-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.raw-form input { flex: 1 1 10em; min-width: 0; }
+
 /* Save bar */
 .savebar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
@@ -329,6 +346,37 @@ pre.trace { margin: 0; max-height: 220px; overflow: auto; font: 0.72rem/1.5 var(
         <select class="field" id="pWrist"><option value="left">Left wrist</option><option value="right">Right wrist</option></select></div>
     </div>
   </section>
+
+  <details class="lab" id="lab">
+    <summary>Register lab <span class="tag">Advanced</span></summary>
+    <div class="lab-body">
+      <p>Hunt for a hidden switch in the watch's display-settings register (<span class="mono">13</span>), for example a day-first date order. The scan backs the register up, flips each of its bits once, keeps note of which ones the watch stores, and puts every bit back.</p>
+      <ol>
+        <li>Connect the watch and keep it in front of you. Press no buttons except (B).</li>
+        <li>Tap <b>Scan for hidden bits</b> (about a minute). The display may flicker as bits change.</li>
+        <li>For each byte the watch keeps, step through its values and watch the date line.</li>
+        <li>Tap <b>Restore backup</b> when you're done, unless you found a value you want to keep.</li>
+      </ol>
+      <p class="hint">If the watch drops the connection, hold (C) for 3 seconds, reconnect and tap <b>Restore backup</b>. If it won't reconnect, turn off the watch's Airplane Mode, or reset its settings as the manual describes.</p>
+      <p class="mono" id="labBackup">Backup: none yet</p>
+      <div class="row-btns">
+        <button class="btn primary" id="btnScan" type="button">Scan for hidden bits</button>
+        <button class="btn" id="btnRestore" type="button" disabled>Restore backup</button>
+      </div>
+      <div class="meter" id="labMeter" hidden><i id="labMeterBar"></i></div>
+      <div class="verdict" id="labVerdict" hidden></div>
+      <div id="labRows"></div>
+      <div class="raw-form">
+        <input class="field" id="rawKey" placeholder="Register, e.g. 13 or 1E 01" aria-label="Register to read" autocomplete="off">
+        <button class="btn small" id="btnRawRead" type="button">Read</button>
+      </div>
+      <div class="raw-form">
+        <input class="field" id="rawData" placeholder="Full payload in hex, e.g. 13 01 00 …" aria-label="Payload to write" autocomplete="off">
+        <button class="btn small" id="btnRawWrite" type="button">Write</button>
+      </div>
+      <pre class="trace" id="rawOut" hidden></pre>
+    </div>
+  </details>
 
   <details class="log" id="logBox">
     <summary>Activity</summary>
@@ -676,6 +724,7 @@ class DemoLink extends Link {
   async sendWrite(d) {
     await new Promise((r) => setTimeout(r, 40));
     const k = hex(d.slice(0, d[0] === REG.DST_STATE || d[0] === REG.DST ? 2 : 1));
+    if (d[0] === REG.BASIC) d = d.map((b, i) => (i === 0 ? b : b & (DemoLink.KEEP_13[i] || 0)));
     if (this.regs.has(k) && d[0] !== REG.APP) this.regs.set(k, Uint8Array.from(d));
   }
   async sendStep(d) {
@@ -692,6 +741,8 @@ class DemoLink extends Link {
   }
   close() {}
 }
+// Bits of register 13 the simulated watch keeps (time format, tone, power saving, light).
+DemoLink.KEEP_13 = { 1: 0x13, 2: 0x01 };
 
 // ======================================================================
 // Reading and applying the whole configuration
@@ -874,7 +925,9 @@ function refresh() {
   $("saveNote").textContent = n ? `${n} change${n > 1 ? "s" : ""} not saved yet` : ui.demo ? "Demo values. Connect to load your watch" : "Everything matches the watch";
   $("btnSave").textContent = `Save to ${target}`;
   $("btnSave").disabled = ui.busy || !n || !ui.link;
-  for (const id of ["btnSyncTime", "btnSteps", "btnReload"]) $(id).disabled = ui.busy || !ui.link;
+  for (const id of ["btnSyncTime", "btnSteps", "btnReload", "btnScan", "btnRawRead", "btnRawWrite"]) $(id).disabled = ui.busy || !ui.link;
+  document.querySelectorAll("#labRows button").forEach((b) => { b.disabled = ui.busy || !ui.link; });
+  if (typeof labShowBackup === "function" && $("labBackup")) labShowBackup();
   $("btnConnect").disabled = ui.busy;
   renderLcd();
 }
@@ -1001,6 +1054,136 @@ $("btnSteps").addEventListener("click", () => run("Reading the step log…", asy
   $("stepsOut").hidden = false;
   say("ok", `Step log read: ${log.today ?? 0} steps today`);
 }));
+// ---- Register lab -------------------------------------------------------
+const LAB_KEY = "abl100we-register13-backup";
+const LAB_LABELS = {
+  1: "Holds 12/24h (0x01), button tone (0x02) and power saving (0x10)",
+  2: "Holds the backlight duration (0x01)",
+  4: "Date order on other Casio models",
+  5: "Weekday language on other Casio models",
+  8: "Font style on other Casio models",
+  10: "Key vibration on other Casio models",
+};
+const lab = { backup: null, kept: {} };
+try { const b = localStorage.getItem(LAB_KEY); if (b) lab.backup = Uint8Array.from(b.split(" ").map((x) => parseInt(x, 16))); } catch (e) { /* storage unavailable */ }
+function labShowBackup() {
+  $("labBackup").textContent = lab.backup ? `Backup: ${hex(lab.backup)}` : "Backup: none yet";
+  $("btnRestore").disabled = !lab.backup || !ui.link || ui.busy;
+}
+async function labSyncForm(raw) {
+  Object.assign(ui.state, P.decodeBasic(raw));
+  fillForm(ui.state);
+}
+function labRenderRows(current) {
+  const rows = Object.keys(lab.kept).map(Number).sort((a, b) => a - b);
+  $("labRows").innerHTML = rows.map((i) => {
+    const masks = Array.from({ length: 8 }, (_, b) => 1 << b).filter((m) => lab.kept[i] & m).map((m) => hex([m])).join(" ");
+    return `<div class="lab-row" data-byte="${i}">
+      <div class="top"><b>Byte ${i}</b><span class="mono">keeps bits ${masks}</span></div>
+      <span class="hint">${LAB_LABELS[i] || "Not documented for any Casio model"}</span>
+      <div class="stepper">
+        <button class="btn small" type="button" data-step="-1" aria-label="Previous value for byte ${i}">−</button>
+        <output id="labVal${i}">${hex([current[i]])}</output>
+        <button class="btn small" type="button" data-step="1" aria-label="Next value for byte ${i}">+</button>
+        <span class="hint">backup ${lab.backup ? hex([lab.backup[i]]) : "?"}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function labScan() {
+  const link = ui.link;
+  const orig = await link.read(REG.BASIC);
+  lab.backup = orig; lab.kept = {};
+  try { localStorage.setItem(LAB_KEY, hex(orig)); } catch (e) { /* storage unavailable */ }
+  labShowBackup();
+  say("info", `Register 13 backed up: ${hex(orig)}`);
+  $("labMeter").hidden = false;
+  const total = (orig.length - 1) * 8;
+  const side = [];
+  let done = 0;
+  try {
+    for (let i = 1; i < orig.length; i++) {
+      for (let b = 0; b < 8; b++) {
+        const m = 1 << b, test = Uint8Array.from(orig);
+        test[i] ^= m;
+        await link.write(test);
+        const back = await link.read(REG.BASIC, { timeout: 3000 });
+        if ((back[i] ^ orig[i]) & m) lab.kept[i] = (lab.kept[i] || 0) | m;
+        for (let j = 1; j < back.length; j++) if (j !== i && back[j] !== orig[j]) side.push(`flipping byte ${i} bit ${hex([m])} also changed byte ${j} to ${hex([back[j]])}`);
+        await link.write(orig);
+        $("labMeterBar").style.width = `${Math.round(++done / total * 100)}%`;
+      }
+    }
+  } finally {
+    try { await link.write(orig); } catch (e) { /* reported by the caller */ }
+  }
+  const now = await link.read(REG.BASIC);
+  labRenderRows(now);
+  const unknown = Object.keys(lab.kept).map(Number).filter((i) => !(i === 1 && !(lab.kept[1] & ~0x13)) && !(i === 2 && lab.kept[2] === 0x01));
+  const dateKept = !!((lab.kept[4] || 0) & 0x01);
+  let verdict;
+  if (!unknown.length) verdict = "The watch keeps only the settings it is known to have, and it discards the date-order bit other Casio models use. This register has no hidden date setting: the day-first layout isn't in this model's firmware.";
+  else verdict = `The watch keeps data in byte ${unknown.join(", ")} beyond the known settings. Step through ${unknown.length > 1 ? "those bytes" : "that byte"} below and watch the date line.${dateKept ? " Byte 4 bit 01 (date order on other models) is stored." : ""}`;
+  $("labVerdict").textContent = (ui.demo ? "Demo watch (simulated): " : "") + verdict;
+  $("labVerdict").hidden = false;
+  side.forEach((t) => say("warn", t));
+  say("ok", `Scan finished: ${Object.entries(lab.kept).map(([i, m]) => `byte ${i} keeps ${hex([m])}`).join("; ") || "no bits kept"}`);
+}
+async function labStep(i, delta) {
+  const cur = await ui.link.read(REG.BASIC);
+  const t = Uint8Array.from(cur);
+  t[i] = (t[i] + delta + 256) % 256;
+  await ui.link.write(t);
+  const back = await ui.link.read(REG.BASIC);
+  $(`labVal${i}`).textContent = hex([back[i]]);
+  say(back[i] === t[i] ? "info" : "warn", `Byte ${i}: sent ${hex([t[i]])}, watch keeps ${hex([back[i]])}. Check the date line.`);
+  await labSyncForm(back);
+}
+$("btnScan").addEventListener("click", () => run("Scanning register 13…", labScan));
+$("btnRestore").addEventListener("click", () => run("Restoring backup…", async () => {
+  if (!lab.backup || lab.backup[0] !== REG.BASIC) throw new Error("There is no backup to restore.");
+  await ui.link.write(lab.backup);
+  const back = await ui.link.read(REG.BASIC);
+  say(same(back, lab.backup) ? "ok" : "warn", `Register 13 restored: ${hex(back)}`);
+  if (Object.keys(lab.kept).length) labRenderRows(back);
+  await labSyncForm(back);
+}));
+$("labRows").addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-step]");
+  if (!btn) return;
+  const i = Number(btn.closest(".lab-row").dataset.byte);
+  run(`Writing byte ${i}…`, () => labStep(i, Number(btn.dataset.step)));
+});
+const parseHexInput = (v) => {
+  const clean = v.replace(/0x/gi, "").replace(/[^0-9a-f]/gi, "");
+  if (!clean || clean.length % 2) throw new Error("Enter whole bytes in hex, e.g. 13 or 1E 01.");
+  return Uint8Array.from(clean.match(/../g).map((x) => parseInt(x, 16)));
+};
+$("btnRawRead").addEventListener("click", () => run("Reading…", async () => {
+  const key = parseHexInput($("rawKey").value);
+  const v = await ui.link.read(Array.from(key));
+  $("rawOut").hidden = false; $("rawOut").textContent = `${hex(key)} → ${hex(v)}`;
+}));
+let rawArmed = null;
+$("btnRawWrite").addEventListener("click", () => {
+  let data;
+  try { data = parseHexInput($("rawData").value); } catch (e) { say("err", e.message); return; }
+  if (rawArmed !== hex(data)) {   // two taps: the first one asks for confirmation
+    rawArmed = hex(data);
+    $("btnRawWrite").textContent = "Tap again to write";
+    setTimeout(() => { rawArmed = null; $("btnRawWrite").textContent = "Write"; }, 4000);
+    return;
+  }
+  rawArmed = null; $("btnRawWrite").textContent = "Write";
+  run("Writing…", async () => {
+    await ui.link.write(data);
+    const back = await ui.link.read(data[0], { timeout: 3000, optional: true });
+    $("rawOut").hidden = false; $("rawOut").textContent = `wrote ${hex(data)}
+watch → ${back ? hex(back) : "(no answer)"}`;
+    if (back && data[0] === REG.BASIC) await labSyncForm(back);
+  });
+});
+
 document.addEventListener("input", refresh);
 document.addEventListener("change", refresh);
 

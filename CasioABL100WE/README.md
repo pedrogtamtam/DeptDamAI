@@ -126,6 +126,10 @@ python -m abl100we set --date-format MM-DD    # back to the default (month first
 
 `show` reports what is stored in the register, which may not be what the display uses.
 
+**Searching for a hidden switch.** The web version has a **Register lab** (bottom of the page). It backs up register `13` and flips each of its bits once. For each bit it reads the register back to see whether the watch stores it, then restores it. Bits the firmware doesn't implement are dropped on write, so the scan shows exactly which bytes hold real settings. You can then step through values on those bytes and watch the date line, and **Restore backup** puts everything back.
+
+If the scan finds only the known settings, the firmware has no day-first layout. Bluetooth can't add it, and Casio offers no way to update this watch's firmware. That matches the manual (no date-order item in the watch's menu) and the GShockAPI project, which marks this model as having no date format. On the command line, `raw read 13` / `raw write ...` do the same by hand.
+
 ## Change everything at once (backup / restore)
 
 ```bash
